@@ -209,10 +209,35 @@ class CryptoScanner:
         print("="*70 + "\n")
         return True
     
+    def is_bist_trading_time(self):
+        """BIST işlem saatlerinde mi kontrol et (Hafta içi 10:00-17:30 TR)"""
+        if self.market_type != 'BIST':
+            return True  # Kripto için her zaman True
+        
+        # TR saatine çevir (UTC+3)
+        tr_tz = pytz.timezone('Europe/Istanbul')
+        now_tr = datetime.now(tr_tz)
+        
+        # Hafta sonu kontrolü (Cumartesi=5, Pazar=6)
+        if now_tr.weekday() >= 5:
+            return False
+        
+        # Saat kontrolü (10:00-17:30 TR)
+        current_time = now_tr.time()
+        start_time = datetime.strptime('10:00', '%H:%M').time()
+        end_time = datetime.strptime('17:30', '%H:%M').time()
+        
+        return start_time <= current_time <= end_time
+    
     def scan_once(self):
         """Tek tarama döngüsü"""
         scan_time = datetime.now(pytz.utc)
         print(f"\n[{scan_time.strftime('%Y-%m-%d %H:%M:%S UTC')}] Tarama başladı...")
+        
+        # BIST için işlem saatleri kontrolü
+        if self.market_type == 'BIST' and not self.is_bist_trading_time():
+            print(f"⏸️  BIST piyasası kapalı (Hafta içi 10:00-17:30 TR)")
+            return
         
         # Heartbeat dosyası yaz - Railway için
         self._write_heartbeat(scan_time)
