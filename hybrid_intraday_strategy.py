@@ -21,10 +21,12 @@ EXIT RULES:
 İşlem Saatleri:
 - CRYPTO: 7/24 (Her zaman açık)
 - BIST: 10:00-17:00 TR (Hafta içi)
+- US: 09:30-16:00 ET (Hafta içi)
 
 Square Off:
 - CRYPTO: Yok (7/24 çalışır)
 - BIST: 18:00 TR (Tüm pozisyonlar otomatik kapanır)
+- US: 16:00 ET (Market kapanışında otomatik kapanır)
 """
 
 import pandas as pd
@@ -59,11 +61,19 @@ class HybridIntradayStrategy:
             self.TRADING_START_TIME = None
             self.TRADING_END_TIME = None
             self.SQUARE_OFF_TIME = None
-        else:  # BIST
+            self.TIMEZONE = None
+        elif market_type == 'BIST':
             # BIST: 10:00-17:00 TR, Square Off: 18:00 TR
             self.TRADING_START_TIME = "10:00"
             self.TRADING_END_TIME = "17:00"
             self.SQUARE_OFF_TIME = "18:00"
+            self.TIMEZONE = 'Europe/Istanbul'
+        else:  # US
+            # US: 09:30-16:00 ET, Square Off: 16:00 ET (market kapanışı)
+            self.TRADING_START_TIME = "09:30"
+            self.TRADING_END_TIME = "16:00"
+            self.SQUARE_OFF_TIME = "16:00"
+            self.TIMEZONE = 'America/New_York'
         
         print(f"🎯 Hibrit Strateji başlatıldı: {symbol} ({market_type})")
     
@@ -119,10 +129,10 @@ class HybridIntradayStrategy:
         if self.market_type == 'CRYPTO':
             return True
         
-        # BIST için işlem saatleri kontrolü (10:00-17:00 TR)
-        tr_tz = pytz.timezone('Europe/Istanbul')
-        now_tr = datetime.now(tr_tz)
-        current_time = now_tr.time()
+        # BIST ve US için işlem saatleri kontrolü
+        tz = pytz.timezone(self.TIMEZONE)
+        now_local = datetime.now(tz)
+        current_time = now_local.time()
         
         start_time = datetime.strptime(self.TRADING_START_TIME, '%H:%M').time()
         end_time = datetime.strptime(self.TRADING_END_TIME, '%H:%M').time()
@@ -135,10 +145,10 @@ class HybridIntradayStrategy:
         if self.market_type == 'CRYPTO':
             return False
         
-        # BIST için square off kontrolü (18:00 TR)
-        tr_tz = pytz.timezone('Europe/Istanbul')
-        now_tr = datetime.now(tr_tz)
-        current_time = now_tr.time()
+        # BIST ve US için square off kontrolü
+        tz = pytz.timezone(self.TIMEZONE)
+        now_local = datetime.now(tz)
+        current_time = now_local.time()
         
         square_off_time = datetime.strptime(self.SQUARE_OFF_TIME, '%H:%M').time()
         

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Tüm Tarayıcıları Başlat
-Kripto ve BIST tarayıcılarını paralel çalıştırır
+Kripto, BIST ve US tarayıcılarını paralel çalıştırır
 """
 
 import threading
@@ -20,6 +20,12 @@ def run_bist_scanner():
     if scanner.initialize():
         scanner.start()
 
+def run_us_scanner():
+    """US tarayıcısını çalıştır"""
+    scanner = CryptoScanner(market_type='US')
+    if scanner.initialize():
+        scanner.start()
+
 if __name__ == "__main__":
     print("🚀 TÜM TARAYICILAR BAŞLATILIYOR...")
     print("="*70)
@@ -32,10 +38,15 @@ if __name__ == "__main__":
     bist_thread = threading.Thread(target=run_bist_scanner, daemon=True)
     bist_thread.start()
     
+    # US tarayıcısı thread
+    us_thread = threading.Thread(target=run_us_scanner, daemon=True)
+    us_thread.start()
+    
     # Ana thread'i beklet
     try:
         crypto_thread.join()
         bist_thread.join()
+        us_thread.join()
     except KeyboardInterrupt:
         print("\n\n⛔ Tüm tarayıcılar durduruldu.")
 

@@ -16,6 +16,7 @@ from hybrid_intraday_strategy import HybridIntradayStrategy
 from ewp_fibonacci_strategy import ElliottWaveFibonacciStrategy
 from data_fetcher import DataFetcher
 from bist_data_fetcher import BISTDataFetcher
+from us_data_fetcher import USDataFetcher
 import json
 from pathlib import Path
 
@@ -160,16 +161,18 @@ class DataManager:
 # ----------------------------------------------------------------------
 
 class CryptoScanner:
-    """Ana tarayıcı sınıfı - Kripto ve BIST"""
+    """Ana tarayıcı sınıfı - Kripto, BIST ve US"""
     
     def __init__(self, market_type='CRYPTO'):
-        self.market_type = market_type  # 'CRYPTO' veya 'BIST'
+        self.market_type = market_type  # 'CRYPTO', 'BIST' veya 'US'
         self.data_manager = DataManager()
         
         if market_type == 'CRYPTO':
             self.data_fetcher = DataFetcher()
-        else:  # BIST
+        elif market_type == 'BIST':
             self.data_fetcher = BISTDataFetcher()
+        else:  # US
+            self.data_fetcher = USDataFetcher()
         
         self.symbols = []
         self.hybrid_strategies = {}
@@ -188,8 +191,10 @@ class CryptoScanner:
         # Sembolleri çek
         if self.market_type == 'CRYPTO':
             self.symbols = self.data_fetcher.get_all_usdt_pairs()
-        else:  # BIST
+        elif self.market_type == 'BIST':
             self.symbols = self.data_fetcher.get_all_bist_symbols()
+        else:  # US
+            self.symbols = self.data_fetcher.get_all_us_symbols()
         
         print(f"✓ {len(self.symbols)} sembol yüklendi")
         
@@ -209,34 +214,56 @@ class CryptoScanner:
         print("="*70 + "\n")
         return True
     
-    def is_bist_trading_time(self):
-        """BIST işlem saatlerinde mi kontrol et (Hafta içi 10:00-17:30 TR)"""
-        if self.market_type != 'BIST':
+    def is_market_trading_time(self):
+        """Market işlem saatlerinde mi kontrol et"""
+        if self.market_type == 'CRYPTO':
             return True  # Kripto için her zaman True
         
-        # TR saatine çevir (UTC+3)
-        tr_tz = pytz.timezone('Europe/Istanbul')
-        now_tr = datetime.now(tr_tz)
+        if self.market_type == 'BIST':
+            # TR saatine çevir (UTC+3)
+            tr_tz = pytz.timezone('Europe/Istanbul')
+            now_tr = datetime.now(tr_tz)
+            
+            # Hafta sonu kontrolü
+            if now_tr.weekday() >= 5:
+                return False
+            
+            # Saat kontrolü (10:00-17:30 TR)
+            current_time = now_tr.time()
+            start_time = datetime.strptime('10:00', '%H:%M').time()
+            end_time = datetime.strptime('17:30', '%H:%M').time()
+            
+            return start_time <= current_time <= end_time
         
-        # Hafta sonu kontrolü (Cumartesi=5, Pazar=6)
-        if now_tr.weekday() >= 5:
-            return False
+        if self.market_type == 'US':
+            # US saatine çevir (ET = UTC-5 veya UTC-4 DST)
+            us_tz = pytz.timezone('America/New_York')
+            now_us = datetime.now(us_tz)
+            
+            # Hafta sonu kontrolü
+            if now_us.weekday() >= 5:
+                return False
+            
+            # Saat kontrolü (09:30-16:00 ET)
+            current_time = now_us.time()
+            start_time = datetime.strptime('09:30', '%H:%M').time()
+            end_time = datetime.strptime('16:00', '%H:%M').time()
+            
+            return start_time <= current_time <= end_time
         
-        # Saat kontrolü (10:00-17:30 TR)
-        current_time = now_tr.time()
-        start_time = datetime.strptime('10:00', '%H:%M').time()
-        end_time = datetime.strptime('17:30', '%H:%M').time()
-        
-        return start_time <= current_time <= end_time
+        return True
     
     def scan_once(self):
         """Tek tarama döngüsü"""
         scan_time = datetime.now(pytz.utc)
         print(f"\n[{scan_time.strftime('%Y-%m-%d %H:%M:%S UTC')}] Tarama başladı...")
         
-        # BIST için işlem saatleri kontrolü
-        if self.market_type == 'BIST' and not self.is_bist_trading_time():
-            print(f"⏸️  BIST piyasası kapalı (Hafta içi 10:00-17:30 TR)")
+        # Market işlem saatleri kontrolü
+        if not self.is_market_trading_time():
+            if self.market_type == 'BIST':
+                print(f"⏸️  BIST piyasası kapalı (Hafta içi 10:00-17:30 TR)")
+            elif self.market_type == 'US':
+                print(f"⏸️  US piyasası kapalı (Hafta içi 09:30-16:00 ET)")
             return
         
         # Heartbeat dosyası yaz - Railway için
