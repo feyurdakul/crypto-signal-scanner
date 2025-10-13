@@ -263,8 +263,8 @@ def filter_signals_by_system(signals, system, market_type='CRYPTO'):
     
     for signal_key, signal_data in signals.items():
         signal_system = signal_data.get('system', '')
-        # Eski format (HYBRID/ELLIOTT) veya yeni format (HYBRID_CRYPTO/ELLIOTT_BIST)
-        if signal_system == system or signal_system == system_key:
+        # Sadece yeni format ile eşleş (HYBRID_CRYPTO/ELLIOTT_BIST)
+        if signal_system == system_key:
             filtered[signal_key] = signal_data
     
     return filtered
@@ -591,7 +591,7 @@ def main():
             st.metric("Ortalama PnL", f"{system_stats['elliott']['avg_pnl']:.2f}%")
             st.metric("Toplam PnL", f"${system_stats['elliott']['total_pnl']:.2f}")
     
-    with tab4:
+    with tab3:
         st.markdown('<h2 class="system-header">💼 Açık İşlemler</h2>', unsafe_allow_html=True)
         
         # EXIT sinyali olmayan ENTRY sinyallerini bul

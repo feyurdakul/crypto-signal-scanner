@@ -117,12 +117,13 @@ class HybridIntradayStrategy:
             'close': round(latest['Close'], 6)
         }
         
-        # ZAMAN TABANLI ÇIKIŞ - Zorunlu Square Off
-        if self.is_square_off_time():
-            if current_position == 'LONG':
-                return 'LONG_EXIT', "🚪 SEANS SONU - UZUN POZİSYON KAPAT", indicators
-            elif current_position == 'SHORT':
-                return 'SHORT_EXIT', "🚪 SEANS SONU - KISA POZİSYON KAPAT", indicators
+        # ZAMAN TABANLI ÇIKIŞ - Zorunlu Square Off (Sadece BIST için)
+        # Kripto 24/7 çalışır, zaman kısıtlaması yok
+        # if self.is_square_off_time():
+        #     if current_position == 'LONG':
+        #         return 'LONG_EXIT', "🚪 SEANS SONU - UZUN POZİSYON KAPAT", indicators
+        #     elif current_position == 'SHORT':
+        #         return 'SHORT_EXIT', "🚪 SEANS SONU - KISA POZİSYON KAPAT", indicators
         
         # AÇIK POZİSYON VARSA - ÇIKIŞ SİNYALLERİ KONTROL ET
         if current_position == 'LONG':
@@ -140,9 +141,9 @@ class HybridIntradayStrategy:
             return None, None, indicators
         
         # POZİSYON KAPALI - GİRİŞ SİNYALLERİ ARAYIN
-        # Sadece işlem saatlerinde giriş sinyali ver
-        if not self.is_trading_time():
-            return None, None, indicators
+        # Kripto 24/7 çalışır, BIST için işlem saatleri kontrolü yapılabilir
+        # if not self.is_trading_time():
+        #     return None, None, indicators
         
         # LONG GİRİŞ KOŞULLARI
         buy_vwap = latest['Close'] > latest['VWAP']  # VWAP Onayı
