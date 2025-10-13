@@ -15,15 +15,16 @@ ve düzeltme dalgalarının (Dalga 2 ve Dalga 4) bittiği noktada pozisyona girm
 
 import pandas as pd
 import numpy as np
-import pandas_ta as ta
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import pytz
+from technical_indicators import calculate_rsi, calculate_atr, calculate_sma
 
 class ElliottWaveFibonacciStrategy:
     """Elliott Dalga ve Fibonacci Temelli Swing Trading Stratejisi"""
     
-    def __init__(self, symbol: str, timeframe: str = '1h'):
+    def __init__(self, data_fetcher, symbol: str, timeframe: str = '1h'):
+        self.data_fetcher = data_fetcher
         self.symbol = symbol
         self.timeframe = timeframe
         self.df = None
@@ -48,19 +49,12 @@ class ElliottWaveFibonacciStrategy:
         
         print(f"🌊 Elliott Dalga Stratejisi başlatıldı: {symbol}")
     
-    def fetch_data(self, tv_client, limit: int = 500) -> bool:
+    def fetch_data(self, limit: int = 500) -> bool:
         """Veri çek - Swing trading için daha uzun periyot"""
         try:
-            data = tv_client.get_hist(
-                symbol=self.symbol,
-                exchange='BINANCE',
-                interval=self.timeframe,
-                n_bars=limit
-            )
+            self.df = self.data_fetcher.get_ohlcv(self.symbol, self.timeframe, limit)
             
-            if data is not None and not data.empty:
-                self.df = data.copy()
-                self.df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+            if self.df is not None and not self.df.empty:
                 print(f"✅ {self.symbol} verisi çekildi: {len(self.df)} mum")
                 return True
             else:
@@ -78,14 +72,14 @@ class ElliottWaveFibonacciStrategy:
         
         try:
             # SMA'lar (Trend filtresi)
-            self.df['SMA_50'] = ta.sma(self.df['Close'], length=self.SMA_FAST)
-            self.df['SMA_200'] = ta.sma(self.df['Close'], length=self.SMA_SLOW)
+            self.df['SMA_50'] = calculate_sma(self.df['Close'], length=self.SMA_FAST)
+            self.df['SMA_200'] = calculate_sma(self.df['Close'], length=self.SMA_SLOW)
             
             # RSI (Momentum)
-            self.df['RSI'] = ta.rsi(self.df['Close'], length=self.RSI_PERIOD)
+            self.df['RSI'] = calculate_rsi(self.df['Close'], length=self.RSI_PERIOD)
             
             # ATR (Volatilite)
-            self.df['ATR'] = ta.atr(self.df['High'], self.df['Low'], self.df['Close'], length=self.ATR_PERIOD)
+            self.df['ATR'] = calculate_atr(self.df['High'], self.df['Low'], self.df['Close'], length=self.ATR_PERIOD)
             
             # Fibonacci hesaplamaları için swing noktaları
             self._calculate_swing_points()

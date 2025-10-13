@@ -15,18 +15,17 @@ ATR tabanlı risk yönetimi ile sistemik risk kontrolü sağlar.
 
 import pandas as pd
 import numpy as np
-import pandas_ta as ta
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import pytz
+from technical_indicators import calculate_rsi, calculate_adx, calculate_atr, calculate_vwap
 
 class HybridIntradayStrategy:
     """Hibrit Gün İçi Momentum ve Sistemik Risk Yönetimi Stratejisi"""
     
-    def __init__(self, tv_client, symbol: str, exchange: str, timeframe):
-        self.tv_client = tv_client
+    def __init__(self, data_fetcher, symbol: str, timeframe='15m'):
+        self.data_fetcher = data_fetcher
         self.symbol = symbol
-        self.exchange = exchange
         self.timeframe = timeframe
         self.df = None
         
@@ -48,19 +47,8 @@ class HybridIntradayStrategy:
     def fetch_data(self, n_bars: int = 100) -> bool:
         """Veri çek"""
         try:
-            data = self.tv_client.get_hist(
-                symbol=self.symbol,
-                exchange=self.exchange,
-                interval=self.timeframe,
-                n_bars=n_bars
-            )
-            
-            if data is not None and not data.empty:
-                self.df = data.copy()
-                self.df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-                return True
-            else:
-                return False
+            self.df = self.data_fetcher.get_ohlcv(self.symbol, self.timeframe, n_bars)
+            return self.df is not None and not self.df.empty
                 
         except Exception as e:
             print(f"❌ {self.symbol} veri çekme hatası: {e}")
@@ -72,21 +60,32 @@ class HybridIntradayStrategy:
             return
         
         try:
-            # VWAP hesaplama (manuel)
-            self.df['typical_price'] = (self.df['high'] + self.df['low'] + self.df['close']) / 3
-            self.df['tp_volume'] = self.df['typical_price'] * self.df['volume']
-            self.df['cumulative_tp_volume'] = self.df['tp_volume'].cumsum()
-            self.df['cumulative_volume'] = self.df['volume'].cumsum()
-            self.df['VWAP'] = self.df['cumulative_tp_volume'] / self.df['cumulative_volume']
+            # VWAP hesaplama
+            self.df['VWAP'] = calculate_vwap(
+                self.df['High'], 
+                self.df['Low'], 
+                self.df['Close'], 
+                self.df['Volume']
+            )
             
             # ADX hesaplama
-            self.df['ADX'] = ta.adx(self.df['high'], self.df['low'], self.df['close'], length=self.ADX_LENGTH)['ADX_20']
+            self.df['ADX'] = calculate_adx(
+                self.df['High'], 
+                self.df['Low'], 
+                self.df['Close'], 
+                length=self.ADX_LENGTH
+            )
             
             # RSI hesaplama
-            self.df['RSI'] = ta.rsi(self.df['close'], length=self.RSI_LENGTH)
+            self.df['RSI'] = calculate_rsi(self.df['Close'], length=self.RSI_LENGTH)
             
             # ATR hesaplama
-            self.df['ATR'] = ta.atr(self.df['high'], self.df['low'], self.df['close'], length=self.ATR_LENGTH)
+            self.df['ATR'] = calculate_atr(
+                self.df['High'], 
+                self.df['Low'], 
+                self.df['Close'], 
+                length=self.ATR_LENGTH
+            )
             
         except Exception as e:
             print(f"❌ {self.symbol} gösterge hesaplama hatası: {e}")
