@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   TrendingUp, TrendingDown, Activity, DollarSign, 
-  Clock, BarChart3, Globe, Building2, Flag 
+  Clock, BarChart3, Globe, Building2, Flag, RefreshCw 
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -36,6 +36,8 @@ export default function Dashboard() {
   const [selectedMarket, setSelectedMarket] = useState('CRYPTO');
   const [selectedSystem, setSelectedSystem] = useState('ALL');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [scannerStatus, setScannerStatus] = useState<string>('checking...');
 
   useEffect(() => {
     fetchData();
@@ -45,7 +47,7 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const [signalsRes, statsRes, marketsRes] = await Promise.all([
+      const [signalsRes, statsRes, marketsRes, healthRes] = await Promise.all([
         axios.get(`${API_URL}/api/signals`, {
           params: {
             market: selectedMarket !== 'ALL' ? selectedMarket : undefined,
@@ -54,17 +56,26 @@ export default function Dashboard() {
           }
         }),
         axios.get(`${API_URL}/api/signals/stats`),
-        axios.get(`${API_URL}/api/markets`)
+        axios.get(`${API_URL}/api/markets`),
+        axios.get(`${API_URL}/health`)
       ]);
 
       setSignals(signalsRes.data.signals || []);
       setMarketStats(statsRes.data.stats || {});
       setMarkets(marketsRes.data.markets || {});
+      setScannerStatus(healthRes.data.scanner || 'offline');
       setLoading(false);
+      setRefreshing(false);
     } catch (error) {
       console.error('Error fetching data:', error);
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
   };
 
   const getSignalColor = (signalType: string) => {
@@ -109,11 +120,27 @@ export default function Dashboard() {
                 <p className="text-sm text-slate-500">Real-time market analysis</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="flex items-center space-x-2 px-3 py-1.5 bg-green-50 rounded-lg">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-green-700">Live</span>
+            <div className="flex items-center space-x-3">
+              <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg ${
+                scannerStatus === 'online' ? 'bg-green-50' : 'bg-red-50'
+              }`}>
+                <div className={`w-2 h-2 rounded-full ${
+                  scannerStatus === 'online' ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+                }`}></div>
+                <span className={`text-sm font-medium ${
+                  scannerStatus === 'online' ? 'text-green-700' : 'text-red-700'
+                }`}>
+                  Scanner: {scannerStatus}
+                </span>
               </div>
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                <span className="text-sm font-medium">Yenile</span>
+              </button>
             </div>
           </div>
         </div>
