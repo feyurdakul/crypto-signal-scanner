@@ -50,3 +50,4 @@ Thumbs.db
 # Streamlit
 .streamlit/secrets.toml
 .vercel
+frontend/node_modules/
