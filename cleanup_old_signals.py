@@ -18,7 +18,7 @@ def cleanup_old_signals():
     
     try:
         # Eski format sinyalleri sil (HYBRID ve ELLIOTT)
-        response = supabase.client.table('crypto_signals').delete().in_('system', ['HYBRID', 'ELLIOTT']).execute()
+        response = supabase.supabase.table('crypto_signals').delete().in_('system', ['HYBRID', 'ELLIOTT']).execute()
         
         deleted_count = len(response.data) if response.data else 0
         print(f"✅ {deleted_count} eski format sinyal silindi")
