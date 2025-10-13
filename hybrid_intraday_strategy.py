@@ -15,11 +15,16 @@ SELL RULES:
 3. RSI 35'i aşağı kesip altında kapanmalı
 
 EXIT RULES:
-- BUY EXIT: Fiyat VWAP altına düşerse veya saat 15:00'da otomatik kapat
-- SELL EXIT: Fiyat VWAP üzerine çıkarsa veya saat 15:00'da otomatik kapat
+- BUY EXIT: Fiyat VWAP altına düşerse veya square off zamanında otomatik kapat
+- SELL EXIT: Fiyat VWAP üzerine çıkarsa veya square off zamanında otomatik kapat
 
-İşlem Saatleri: 09:15 - 14:30 (Sadece bu saatler arası giriş)
-Square Off: 15:00 (Tüm pozisyonlar otomatik kapanır)
+İşlem Saatleri:
+- CRYPTO: 7/24 (Her zaman açık)
+- BIST: 10:00-17:00 TR (Hafta içi)
+
+Square Off:
+- CRYPTO: Yok (7/24 çalışır)
+- BIST: 18:00 TR (Tüm pozisyonlar otomatik kapanır)
 """
 
 import pandas as pd
@@ -32,10 +37,11 @@ from technical_indicators import calculate_rsi, calculate_adx, calculate_atr, ca
 class HybridIntradayStrategy:
     """Hibrit Gün İçi Momentum ve Sistemik Risk Yönetimi Stratejisi"""
     
-    def __init__(self, data_fetcher, symbol: str, timeframe='15m'):
+    def __init__(self, data_fetcher, symbol: str, timeframe='15m', market_type='CRYPTO'):
         self.data_fetcher = data_fetcher
         self.symbol = symbol
         self.timeframe = timeframe
+        self.market_type = market_type  # 'CRYPTO' veya 'BIST'
         self.df = None
         
         # Strateji parametreleri (TradingView koduna göre)
@@ -47,12 +53,19 @@ class HybridIntradayStrategy:
         self.RSI_BUY_LEVEL = 55
         self.RSI_SELL_LEVEL = 35
         
-        # İşlem saatleri (TR saati - UTC+3)
-        self.TRADING_START_TIME = "09:15"  # 09:15 TR
-        self.TRADING_END_TIME = "14:30"    # 14:30 TR
-        self.SQUARE_OFF_TIME = "15:00"     # 15:00 TR (Otomatik kapat)
+        # İşlem saatleri (Market type'a göre)
+        if market_type == 'CRYPTO':
+            # Kripto: 7/24 çalışır
+            self.TRADING_START_TIME = None
+            self.TRADING_END_TIME = None
+            self.SQUARE_OFF_TIME = None
+        else:  # BIST
+            # BIST: 10:00-17:00 TR, Square Off: 18:00 TR
+            self.TRADING_START_TIME = "10:00"
+            self.TRADING_END_TIME = "17:00"
+            self.SQUARE_OFF_TIME = "18:00"
         
-        print(f"🎯 Hibrit Strateji başlatıldı: {symbol}")
+        print(f"🎯 Hibrit Strateji başlatıldı: {symbol} ({market_type})")
     
     def fetch_data(self, n_bars: int = 100) -> bool:
         """Veri çek"""
@@ -101,7 +114,12 @@ class HybridIntradayStrategy:
             print(f"❌ {self.symbol} gösterge hesaplama hatası: {e}")
     
     def is_trading_time(self) -> bool:
-        """İşlem saatlerinde mi kontrol et (09:15-14:30 TR)"""
+        """İşlem saatlerinde mi kontrol et"""
+        # Kripto için her zaman True
+        if self.market_type == 'CRYPTO':
+            return True
+        
+        # BIST için işlem saatleri kontrolü (10:00-17:00 TR)
         tr_tz = pytz.timezone('Europe/Istanbul')
         now_tr = datetime.now(tr_tz)
         current_time = now_tr.time()
@@ -112,7 +130,12 @@ class HybridIntradayStrategy:
         return start_time <= current_time <= end_time
     
     def is_square_off_time(self) -> bool:
-        """Square off zamanı mı (15:00 TR)"""
+        """Square off zamanı mı"""
+        # Kripto için square off yok
+        if self.market_type == 'CRYPTO':
+            return False
+        
+        # BIST için square off kontrolü (18:00 TR)
         tr_tz = pytz.timezone('Europe/Istanbul')
         now_tr = datetime.now(tr_tz)
         current_time = now_tr.time()
@@ -137,12 +160,12 @@ class HybridIntradayStrategy:
             'close': round(latest['Close'], 6)
         }
         
-        # ZAMAN TABANLI ÇIKIŞ - Square Off (15:00 TR)
+        # ZAMAN TABANLI ÇIKIŞ - Square Off (Sadece BIST için 18:00 TR)
         if self.is_square_off_time():
             if current_position == 'LONG':
-                return 'LONG_EXIT', "🚪 15:00 SQUARE OFF - UZUN POZİSYON KAPAT", indicators
+                return 'LONG_EXIT', "🚪 18:00 SQUARE OFF - UZUN POZİSYON KAPAT", indicators
             elif current_position == 'SHORT':
-                return 'SHORT_EXIT', "🚪 15:00 SQUARE OFF - KISA POZİSYON KAPAT", indicators
+                return 'SHORT_EXIT', "🚪 18:00 SQUARE OFF - KISA POZİSYON KAPAT", indicators
         
         # AÇIK POZİSYON VARSA - ÇIKIŞ SİNYALLERİ
         if current_position == 'LONG':

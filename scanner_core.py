@@ -195,9 +195,9 @@ class CryptoScanner:
         
         # Her iki sistemi de oluştur
         for symbol in self.symbols:
-            # Hibrit Strateji (15 dakika)
+            # Hibrit Strateji (15 dakika) - market_type ile
             self.hybrid_strategies[symbol] = HybridIntradayStrategy(
-                self.data_fetcher, symbol, '15m'
+                self.data_fetcher, symbol, '15m', self.market_type
             )
             
             # Elliott Strateji (1 saat)
