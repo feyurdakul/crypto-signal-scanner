@@ -591,7 +591,7 @@ def main():
             st.metric("Ortalama PnL", f"{system_stats['elliott']['avg_pnl']:.2f}%")
             st.metric("Toplam PnL", f"${system_stats['elliott']['total_pnl']:.2f}")
     
-    with tab3:
+    with tab4:
         st.markdown('<h2 class="system-header">💼 Açık İşlemler</h2>', unsafe_allow_html=True)
         
         # EXIT sinyali olmayan ENTRY sinyallerini bul
