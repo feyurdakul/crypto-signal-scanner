@@ -3,9 +3,9 @@
 echo "🚀 RAILWAY DEPLOYMENT - STARTING..."
 echo "======================================"
 
-# Scanner'ı arka planda başlat
-echo "1. Starting scanner..."
-python scanner_core.py &
+# Tüm scanner'ları arka planda başlat (Kripto + BIST)
+echo "1. Starting all scanners (Crypto + BIST)..."
+python run_all_scanners.py &
 SCANNER_PID=$!
 echo "   ✓ Scanner PID: $SCANNER_PID"
 

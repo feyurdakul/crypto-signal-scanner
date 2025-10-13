@@ -253,14 +253,18 @@ def get_strength_emoji(score):
     else:
         return "⚠️"
 
-def filter_signals_by_system(signals, system):
-    """Sistem bazlı sinyal filtreleme"""
+def filter_signals_by_system(signals, system, market_type='CRYPTO'):
+    """Sistem ve market bazlı sinyal filtreleme"""
     if not signals:
         return {}
     
     filtered = {}
+    system_key = f"{system}_{market_type}"
+    
     for signal_key, signal_data in signals.items():
-        if signal_data.get('system') == system:
+        signal_system = signal_data.get('system', '')
+        # Eski format (HYBRID/ELLIOTT) veya yeni format (HYBRID_CRYPTO/ELLIOTT_BIST)
+        if signal_system == system or signal_system == system_key:
             filtered[signal_key] = signal_data
     
     return filtered
@@ -372,14 +376,14 @@ def main():
         system_filter = st.selectbox("Sistem:", ["Tümü", "HYBRID", "ELLIOTT"])
     
     # Ana İçerik
-    tab1, tab2, tab3, tab4 = st.tabs(["📈 Canlı Sinyaller", "📊 Sistem Karşılaştırması", "💼 Açık İşlemler", "📋 İşlem Geçmişi"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["💰 KRİPTO", "🏛️ BIST", "📊 Sistem Karşılaştırması", "💼 Açık İşlemler", "📋 İşlem Geçmişi"])
     
     with tab1:
-        st.markdown('<h2 class="system-header">🔔 Canlı Sinyaller (Son 10)</h2>', unsafe_allow_html=True)
+        st.markdown('<h2 class="system-header">💰 KRİPTO - Canlı Sinyaller (Son 10)</h2>', unsafe_allow_html=True)
         
-        # Sistem bazlı sinyaller - Tüm sinyaller
-        all_hybrid_signals = filter_signals_by_system(signals, 'HYBRID')
-        all_elliott_signals = filter_signals_by_system(signals, 'ELLIOTT')
+        # Kripto sinyalleri
+        all_hybrid_signals = filter_signals_by_system(signals, 'HYBRID', 'CRYPTO')
+        all_elliott_signals = filter_signals_by_system(signals, 'ELLIOTT', 'CRYPTO')
         
         # Son 10 sinyali göster
         hybrid_signals = dict(list(all_hybrid_signals.items())[:10])
@@ -470,6 +474,97 @@ def main():
                 st.info("Elliott sistem için sinyal bulunamadı.")
     
     with tab2:
+        st.markdown('<h2 class="system-header">🏛️ BIST - Canlı Sinyaller (Son 10)</h2>', unsafe_allow_html=True)
+        
+        # BIST sinyalleri
+        all_hybrid_signals_bist = filter_signals_by_system(signals, 'HYBRID', 'BIST')
+        all_elliott_signals_bist = filter_signals_by_system(signals, 'ELLIOTT', 'BIST')
+        
+        # Son 10 sinyali göster
+        hybrid_signals_bist = dict(list(all_hybrid_signals_bist.items())[:10])
+        elliott_signals_bist = dict(list(all_elliott_signals_bist.items())[:10])
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown('<h3 style="color: #FF9800;">🎯 HİBRİT SİSTEM SİNYALLERİ</h3>', unsafe_allow_html=True)
+            if hybrid_signals_bist:
+                for signal_key, signal_data in hybrid_signals_bist.items():
+                    symbol = signal_data.get('symbol', 'N/A')
+                    if search_symbol and search_symbol.upper() not in symbol.upper():
+                        continue
+                    if signal_filter != "Tümü" and signal_data.get('signal_type') != signal_filter:
+                        continue
+                    
+                    strength_score = calculate_signal_strength(signal_data)
+                    strength_emoji = get_strength_emoji(strength_score)
+                    
+                    signal_type = signal_data.get('signal_type', 'N/A')
+                    if 'ENTRY' in signal_type:
+                        if 'LONG' in signal_type:
+                            signal_color = '#4CAF50'
+                            signal_bg = '#E8F5E9'
+                        else:
+                            signal_color = '#F44336'
+                            signal_bg = '#FFEBEE'
+                    else:
+                        signal_color = '#FF9800'
+                        signal_bg = '#FFF8E1'
+                    
+                    with st.container():
+                        st.markdown(f'''
+                        <div class="signal-card" style="background-color: {signal_bg}; border-left-color: {signal_color};">
+                            <strong style="color: {signal_color};">{symbol}</strong> - 
+                            <span style="color: {signal_color}; font-weight: bold;">{signal_type}</span>
+                            <span style="float: right;">{strength_emoji} {strength_score}/100</span><br>
+                            <em>{signal_data.get('message', 'N/A')}</em><br>
+                            💰 ₺{signal_data.get('price', 0):.2f} | 
+                            ⏰ {signal_data.get('timestamp', 'N/A')[:16]}
+                        </div>
+                        ''', unsafe_allow_html=True)
+            else:
+                st.info("BIST Hibrit sistem için sinyal bulunamadı.")
+        
+        with col2:
+            st.markdown('<h3 style="color: #2196F3;">🌊 ELLİOTT SİSTEM SİNYALLERİ</h3>', unsafe_allow_html=True)
+            if elliott_signals_bist:
+                for signal_key, signal_data in elliott_signals_bist.items():
+                    symbol = signal_data.get('symbol', 'N/A')
+                    if search_symbol and search_symbol.upper() not in symbol.upper():
+                        continue
+                    if signal_filter != "Tümü" and signal_data.get('signal_type') != signal_filter:
+                        continue
+                    
+                    strength_score = calculate_signal_strength(signal_data)
+                    strength_emoji = get_strength_emoji(strength_score)
+                    
+                    signal_type = signal_data.get('signal_type', 'N/A')
+                    if 'ENTRY' in signal_type:
+                        if 'LONG' in signal_type:
+                            signal_color = '#4CAF50'
+                            signal_bg = '#E8F5E9'
+                        else:
+                            signal_color = '#F44336'
+                            signal_bg = '#FFEBEE'
+                    else:
+                        signal_color = '#2196F3'
+                        signal_bg = '#E3F2FD'
+                    
+                    with st.container():
+                        st.markdown(f'''
+                        <div class="signal-card" style="background-color: {signal_bg}; border-left-color: {signal_color};">
+                            <strong style="color: {signal_color};">{symbol}</strong> - 
+                            <span style="color: {signal_color}; font-weight: bold;">{signal_type}</span>
+                            <span style="float: right;">{strength_emoji} {strength_score}/100</span><br>
+                            <em>{signal_data.get('message', 'N/A')}</em><br>
+                            💰 ₺{signal_data.get('price', 0):.2f} | 
+                            ⏰ {signal_data.get('timestamp', 'N/A')[:16]}
+                        </div>
+                        ''', unsafe_allow_html=True)
+            else:
+                st.info("BIST Elliott sistem için sinyal bulunamadı.")
+    
+    with tab3:
         st.markdown('<h2 class="system-header">📊 Sistem Performans Karşılaştırması</h2>', unsafe_allow_html=True)
         
         # Sistem karşılaştırma grafiği
@@ -604,7 +699,7 @@ def main():
         else:
             st.info("Hiç açık işlem bulunamadı.")
     
-    with tab4:
+    with tab5:
         st.markdown('<h2 class="system-header">📋 İşlem Geçmişi</h2>', unsafe_allow_html=True)
         
         if closed_trades:

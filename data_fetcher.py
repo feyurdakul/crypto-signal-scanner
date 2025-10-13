@@ -62,4 +62,8 @@ class DataFetcher:
         except Exception as e:
             print(f"❌ Sembol çekme hatası: {e}")
             return []
+    
+    def clean_symbol_for_display(self, symbol):
+        """Görüntüleme için sembol temizle (kripto için değişiklik yok)"""
+        return symbol
 

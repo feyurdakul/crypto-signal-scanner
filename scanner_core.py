@@ -15,6 +15,7 @@ from supabase_client import SupabaseManager
 from hybrid_intraday_strategy import HybridIntradayStrategy
 from ewp_fibonacci_strategy import ElliottWaveFibonacciStrategy
 from data_fetcher import DataFetcher
+from bist_data_fetcher import BISTDataFetcher
 import json
 from pathlib import Path
 
@@ -159,27 +160,37 @@ class DataManager:
 # ----------------------------------------------------------------------
 
 class CryptoScanner:
-    """Ana tarayıcı sınıfı"""
+    """Ana tarayıcı sınıfı - Kripto ve BIST"""
     
-    def __init__(self):
+    def __init__(self, market_type='CRYPTO'):
+        self.market_type = market_type  # 'CRYPTO' veya 'BIST'
         self.data_manager = DataManager()
-        self.data_fetcher = DataFetcher()
+        
+        if market_type == 'CRYPTO':
+            self.data_fetcher = DataFetcher()
+        else:  # BIST
+            self.data_fetcher = BISTDataFetcher()
+        
         self.symbols = []
         self.hybrid_strategies = {}
         self.elliott_strategies = {}
         self.running = False
         self.scan_interval = 60
         self.dual_system_mode = DUAL_SYSTEM_MODE
-        print(f"🚀 Kripto Sinyal Tarayıcı başlatıldı! Mod: {'Çoklu Sistem' if self.dual_system_mode else 'Tek Sistem'}")
+        print(f"🚀 {market_type} Sinyal Tarayıcı başlatıldı! Mod: {'Çoklu Sistem' if self.dual_system_mode else 'Tek Sistem'}")
     
     def initialize(self):
         """Başlat"""
         print("\n" + "="*70)
-        print("### KRİPTO SİNYAL TARAYICI - BAŞLATILIYOR ###")
+        print(f"### {self.market_type} SİNYAL TARAYICI - BAŞLATILIYOR ###")
         print("="*70)
         
         # Sembolleri çek
-        self.symbols = self.data_fetcher.get_all_usdt_pairs()
+        if self.market_type == 'CRYPTO':
+            self.symbols = self.data_fetcher.get_all_usdt_pairs()
+        else:  # BIST
+            self.symbols = self.data_fetcher.get_all_bist_symbols()
+        
         print(f"✓ {len(self.symbols)} sembol yüklendi")
         
         # Her iki sistemi de oluştur
@@ -224,21 +235,22 @@ class CryptoScanner:
                         price = indicators.get('close', 0)
                         atr_value = indicators.get('atr', 0)
                         
-                        # Sinyali kaydet
-                        self.data_manager.add_signal(symbol, signal, message, price, indicators, 'HYBRID')
+                        # Sinyali kaydet (market_type ekle)
+                        display_symbol = self.data_fetcher.clean_symbol_for_display(symbol) if self.market_type == 'BIST' else symbol
+                        self.data_manager.add_signal(display_symbol, signal, message, price, indicators, f'HYBRID_{self.market_type}')
                         
                         # Giriş sinyali ise işlem aç
                         if signal in ['LONG_ENTRY', 'SHORT_ENTRY']:
                             self.data_manager.open_trade(
-                                symbol, signal, price, 
+                                display_symbol, signal, price, 
                                 datetime.now(pytz.utc).isoformat(), 
-                                atr_value, ATR_SL_MULTIPLIER, ATR_TP_MULTIPLIER, 'HYBRID'
+                                atr_value, ATR_SL_MULTIPLIER, ATR_TP_MULTIPLIER, f'HYBRID_{self.market_type}'
                             )
                         # Çıkış sinyali ise işlem kapat
                         elif signal in ['LONG_EXIT', 'SHORT_EXIT']:
                             self.data_manager.close_trade(
-                                symbol, signal, price,
-                                datetime.now(pytz.utc).isoformat(), 'HYBRID'
+                                display_symbol, signal, price,
+                                datetime.now(pytz.utc).isoformat(), f'HYBRID_{self.market_type}'
                             )
                         
                         signal_count += 1
@@ -263,21 +275,22 @@ class CryptoScanner:
                         price = indicators.get('close', 0)
                         atr_value = indicators.get('atr', 0)
                         
-                        # Sinyali kaydet
-                        self.data_manager.add_signal(symbol, signal, message, price, indicators, 'ELLIOTT')
+                        # Sinyali kaydet (market_type ekle)
+                        display_symbol = self.data_fetcher.clean_symbol_for_display(symbol) if self.market_type == 'BIST' else symbol
+                        self.data_manager.add_signal(display_symbol, signal, message, price, indicators, f'ELLIOTT_{self.market_type}')
                         
                         # Giriş sinyali ise işlem aç
                         if signal in ['LONG_ENTRY', 'SHORT_ENTRY']:
                             self.data_manager.open_trade(
-                                symbol, signal, price, 
+                                display_symbol, signal, price, 
                                 datetime.now(pytz.utc).isoformat(), 
-                                atr_value, EWP_ATR_SL_MULTIPLIER, EWP_ATR_TP_MULTIPLIER, 'ELLIOTT'
+                                atr_value, EWP_ATR_SL_MULTIPLIER, EWP_ATR_TP_MULTIPLIER, f'ELLIOTT_{self.market_type}'
                             )
                         # Çıkış sinyali ise işlem kapat
                         elif signal in ['LONG_EXIT', 'SHORT_EXIT']:
                             self.data_manager.close_trade(
-                                symbol, signal, price,
-                                datetime.now(pytz.utc).isoformat(), 'ELLIOTT'
+                                display_symbol, signal, price,
+                                datetime.now(pytz.utc).isoformat(), f'ELLIOTT_{self.market_type}'
                             )
                         
                         signal_count += 1
