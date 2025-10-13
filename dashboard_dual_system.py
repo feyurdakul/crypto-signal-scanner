@@ -13,6 +13,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import time
 from supabase_client import SupabaseManager
+import pytz
 
 # Sayfa yapılandırması
 st.set_page_config(
@@ -136,6 +137,23 @@ def get_css():
 @st.cache_resource
 def get_supabase_manager():
     return SupabaseManager()
+
+def check_scanner_status():
+    """Scanner'ın çalışıp çalışmadığını kontrol et"""
+    try:
+        heartbeat_file = Path('heartbeat.json')
+        if heartbeat_file.exists():
+            data = json.loads(heartbeat_file.read_text())
+            last_scan = datetime.fromisoformat(data['last_scan'])
+            now = datetime.now(pytz.utc)
+            diff = (now - last_scan).total_seconds()
+            
+            # Son 2 dakika içinde tarama yapılmışsa çalışıyor
+            is_running = diff < 120
+            return is_running, last_scan, diff
+        return False, None, None
+    except Exception as e:
+        return False, None, None
 
 @st.cache_data(ttl=5)
 def load_signals():
@@ -307,6 +325,18 @@ def main():
     with st.sidebar:
         st.image("https://cryptologos.cc/logos/bitcoin-btc-logo.png", width=80)
         st.title("⚙️ Kontrol Paneli")
+        
+        # Scanner Durumu
+        is_running, last_scan, diff = check_scanner_status()
+        if is_running:
+            st.success("✅ Scanner Çalışıyor")
+            if last_scan:
+                st.caption(f"Son tarama: {int(diff)}s önce")
+        else:
+            st.error("❌ Scanner Durmuş")
+            st.caption("Scanner başlatılıyor olabilir...")
+        
+        st.divider()
         
         # Dark Mode Toggle
         if st.button("🌙 Dark Mode" if not st.session_state.dark_mode else "☀️ Light Mode"):

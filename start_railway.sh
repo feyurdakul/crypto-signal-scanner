@@ -5,7 +5,7 @@ echo "======================================"
 
 # Scanner'ı arka planda başlat
 echo "1. Starting scanner..."
-python scanner_core_dual.py &
+python scanner_core.py &
 SCANNER_PID=$!
 echo "   ✓ Scanner PID: $SCANNER_PID"
 

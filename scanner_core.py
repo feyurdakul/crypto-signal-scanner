@@ -15,6 +15,8 @@ from supabase_client import SupabaseManager
 from hybrid_intraday_strategy import HybridIntradayStrategy
 from ewp_fibonacci_strategy import ElliottWaveFibonacciStrategy
 from data_fetcher import DataFetcher
+import json
+from pathlib import Path
 
 # ----------------------------------------------------------------------
 # 1. AYARLAR
@@ -198,7 +200,11 @@ class CryptoScanner:
     
     def scan_once(self):
         """Tek tarama döngüsü"""
-        print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}] Tarama başladı...")
+        scan_time = datetime.now(pytz.utc)
+        print(f"\n[{scan_time.strftime('%Y-%m-%d %H:%M:%S UTC')}] Tarama başladı...")
+        
+        # Heartbeat dosyası yaz - Railway için
+        self._write_heartbeat(scan_time)
         
         signal_count = 0
         error_count = 0
@@ -308,6 +314,19 @@ class CryptoScanner:
     def stop(self):
         """Taramayı durdur"""
         self.running = False
+    
+    def _write_heartbeat(self, scan_time):
+        """Heartbeat dosyası yaz - uygulamanın çalıştığını gösterir"""
+        try:
+            heartbeat_file = Path('heartbeat.json')
+            heartbeat_data = {
+                'last_scan': scan_time.isoformat(),
+                'status': 'running',
+                'timestamp': datetime.now(pytz.utc).isoformat()
+            }
+            heartbeat_file.write_text(json.dumps(heartbeat_data, indent=2))
+        except Exception as e:
+            print(f"⚠️ Heartbeat yazma hatası: {e}")
 
 # ----------------------------------------------------------------------
 # 4. ANA FONKSİYON
