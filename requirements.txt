@@ -9,5 +9,5 @@ pytz>=2023.3
 requests>=2.28.0
 supabase>=2.0.0
 python-dotenv>=1.0.0
-pandas-ta==0.3.14b
-tvdatafeed==2.1.6
+pandas-ta
+tvdatafeed
