@@ -2,28 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
-}
-
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  @apply bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100;
 }
 
 @layer utilities {
@@ -39,21 +19,45 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  @apply bg-slate-100 dark:bg-slate-800;
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #888;
+  @apply bg-slate-400 dark:bg-slate-600;
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  @apply bg-slate-500 dark:bg-slate-500;
+}
+
+/* Table styles */
+table {
+  @apply w-full;
+}
+
+thead {
+  @apply bg-slate-50 dark:bg-slate-800 border-b dark:border-slate-700;
+}
+
+th {
+  @apply text-left px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400;
+}
+
+td {
+  @apply px-4 py-2 text-sm;
+}
+
+tbody tr {
+  @apply border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800;
+}
+
+tbody tr:last-child {
+  @apply border-b-0;
 }
 
 /* Smooth transitions */
 * {
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
-

@@ -5,7 +5,7 @@ import axios from 'axios';
 import { 
   TrendingUp, TrendingDown, Activity, DollarSign,
   Clock, BarChart3, Globe, Building2, Flag, RefreshCw,
-  Search, Star, StarOff, ArrowUpDown
+  Search, Star, StarOff, ArrowUpDown, Moon, Sun, X, AlertCircle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -44,6 +44,8 @@ export default function Dashboard() {
   const [sortBy, setSortBy] = useState<'timestamp' | 'symbol' | 'price'>('timestamp');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
+  const [darkMode, setDarkMode] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -66,6 +68,31 @@ export default function Dashboard() {
     } catch {}
   }, [watchlist]);
 
+  // Load dark mode preference
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('darkMode');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDark = stored ? stored === 'true' : prefersDark;
+      setDarkMode(isDark);
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      }
+    } catch {}
+  }, []);
+
+  // Persist dark mode
+  useEffect(() => {
+    try {
+      localStorage.setItem('darkMode', String(darkMode));
+      if (darkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    } catch {}
+  }, [darkMode]);
+
   const fetchData = async () => {
     try {
       const [signalsRes, statsRes, marketsRes, healthRes] = await Promise.all([
@@ -87,8 +114,10 @@ export default function Dashboard() {
       setScannerStatus(healthRes.data.scanner || 'offline');
       setLoading(false);
       setRefreshing(false);
+      setError(null);
     } catch (error) {
       console.error('Error fetching data:', error);
+      setError(axios.isAxiosError(error) ? 'Network error - Unable to connect to API' : 'An unexpected error occurred');
       setLoading(false);
       setRefreshing(false);
     }
@@ -161,10 +190,10 @@ export default function Dashboard() {
 
   const getSystemBadge = (system: string) => {
     if (system.includes('HYBRID')) {
-      return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">HYBRID</span>;
+      return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300">HYBRID</span>;
     }
     if (system.includes('ELLIOTT')) {
-      return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">ELLIOTT</span>;
+      return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">ELLIOTT</span>;
     }
     return null;
   };
@@ -179,9 +208,32 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      {/* Error Banner */}
+      {error && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800 px-4 py-3"
+        >
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+              <span className="text-sm text-red-700 dark:text-red-300">{error}</span>
+            </div>
+            <button 
+              onClick={() => setError(null)} 
+              className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </motion.div>
+      )}
+
       {/* Header */}
-      <header className="bg-white border-b border-slate-200">
+      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -189,19 +241,26 @@ export default function Dashboard() {
                 <BarChart3 className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">Trading Signal Dashboard</h1>
-                <p className="text-sm text-slate-500">Real-time market analysis</p>
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Trading Signal Dashboard</h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Real-time market analysis</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                aria-label="Toggle dark mode"
+              >
+                {darkMode ? <Sun className="w-5 h-5 text-slate-900 dark:text-slate-100" /> : <Moon className="w-5 h-5 text-slate-900" />}
+              </button>
               <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg ${
-                scannerStatus === 'online' ? 'bg-green-50' : 'bg-red-50'
+                scannerStatus === 'online' ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
               }`}>
                 <div className={`w-2 h-2 rounded-full ${
                   scannerStatus === 'online' ? 'bg-green-500 animate-pulse' : 'bg-red-500'
                 }`}></div>
                 <span className={`text-sm font-medium ${
-                  scannerStatus === 'online' ? 'text-green-700' : 'text-red-700'
+                  scannerStatus === 'online' ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'
                 }`}>
                   Scanner: {scannerStatus}
                 </span>
@@ -227,7 +286,7 @@ export default function Dashboard() {
               <button
                 key={m}
                 onClick={() => setSelectedMarket(m)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${selectedMarket === m ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${selectedMarket === m ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
               >
                 <span className="inline-flex items-center space-x-1">
                   {getMarketIcon(m)}
@@ -237,23 +296,23 @@ export default function Dashboard() {
             ))}
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white rounded-lg border border-slate-200 p-3">
-              <div className="text-xs text-slate-500">Signals</div>
-              <div className="text-lg font-semibold text-slate-900">{kpi.total}</div>
+            <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+              <div className="text-xs text-slate-500 dark:text-slate-400">Signals</div>
+              <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{kpi.total}</div>
             </div>
-            <div className="bg-white rounded-lg border border-slate-200 p-3">
-              <div className="text-xs text-slate-500">Entries</div>
-              <div className="text-lg font-semibold text-green-700">{kpi.entries}</div>
+            <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+              <div className="text-xs text-slate-500 dark:text-slate-400">Entries</div>
+              <div className="text-lg font-semibold text-green-700 dark:text-green-400">{kpi.entries}</div>
             </div>
-            <div className="bg-white rounded-lg border border-slate-200 p-3">
-              <div className="text-xs text-slate-500">Exits</div>
-              <div className="text-lg font-semibold text-slate-700">{kpi.exits}</div>
+            <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+              <div className="text-xs text-slate-500 dark:text-slate-400">Exits</div>
+              <div className="text-lg font-semibold text-slate-700 dark:text-slate-300">{kpi.exits}</div>
             </div>
           </div>
         </div>
 
         {/* Filters Bar */}
-        <div className="bg-white border border-slate-200 rounded-lg p-3 mb-6">
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 mb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div className="flex-1 flex items-center gap-2">
               <div className="relative w-full md:max-w-sm">
@@ -261,16 +320,16 @@ export default function Dashboard() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search symbol..."
-                  className="w-full pl-9 pr-3 py-2 rounded-md border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                  className="w-full pl-9 pr-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
                 />
-                <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" />
+                <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-2.5 top-2.5" />
               </div>
               <div className="flex items-center gap-2">
                 {['ALL', 'ENTRY', 'EXIT'].map(scope => (
                   <button
                     key={scope}
                     onClick={() => setSignalScope(scope as any)}
-                    className={`px-3 py-1.5 rounded-md text-sm border ${signalScope === scope ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
+                    className={`px-3 py-1.5 rounded-md text-sm border ${signalScope === scope ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                   >{scope}</button>
                 ))}
               </div>
@@ -278,21 +337,21 @@ export default function Dashboard() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => { setSortBy('timestamp'); setSortDir(sortBy === 'timestamp' && sortDir === 'desc' ? 'asc' : 'desc'); }}
-                className={`px-3 py-1.5 rounded-md text-sm border ${sortBy === 'timestamp' ? 'border-blue-600 text-blue-700' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                className={`px-3 py-1.5 rounded-md text-sm border ${sortBy === 'timestamp' ? 'border-blue-600 text-blue-700 dark:text-blue-400 dark:border-blue-500' : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                 title="Sort by time"
               >
                 <span className="inline-flex items-center gap-1">Time <ArrowUpDown className="w-4 h-4" /></span>
               </button>
               <button
                 onClick={() => { setSortBy('symbol'); setSortDir(sortBy === 'symbol' && sortDir === 'asc' ? 'desc' : 'asc'); }}
-                className={`px-3 py-1.5 rounded-md text-sm border ${sortBy === 'symbol' ? 'border-blue-600 text-blue-700' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                className={`px-3 py-1.5 rounded-md text-sm border ${sortBy === 'symbol' ? 'border-blue-600 text-blue-700 dark:text-blue-400 dark:border-blue-500' : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                 title="Sort by symbol"
               >
                 <span className="inline-flex items-center gap-1">Symbol <ArrowUpDown className="w-4 h-4" /></span>
               </button>
               <button
                 onClick={() => { setSortBy('price'); setSortDir(sortBy === 'price' && sortDir === 'asc' ? 'desc' : 'asc'); }}
-                className={`px-3 py-1.5 rounded-md text-sm border ${sortBy === 'price' ? 'border-blue-600 text-blue-700' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+                className={`px-3 py-1.5 rounded-md text-sm border ${sortBy === 'price' ? 'border-blue-600 text-blue-700 dark:text-blue-400 dark:border-blue-500' : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                 title="Sort by price"
               >
                 <span className="inline-flex items-center gap-1">Price <ArrowUpDown className="w-4 h-4" /></span>
@@ -303,7 +362,7 @@ export default function Dashboard() {
 
         {/* System Filter */}
         <div className="flex items-center gap-2 mb-4">
-          <span className="text-sm text-slate-600">System:</span>
+          <span className="text-sm text-slate-600 dark:text-slate-400">System:</span>
           {['ALL', 'HYBRID', 'ELLIOTT'].map((system) => (
             <button
               key={system}
@@ -311,7 +370,7 @@ export default function Dashboard() {
               className={`px-3 py-1.5 rounded-md text-sm border ${
                 selectedSystem === system
                   ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
               }`}
             >
               {system}
@@ -320,10 +379,10 @@ export default function Dashboard() {
         </div>
 
         {/* Signals Table */}
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-700">Live Signals ({filteredSortedSignals.length})</h2>
-            <span className="text-xs text-slate-500">Sorted by {sortBy} · {sortDir}</span>
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Live Signals ({filteredSortedSignals.length})</h2>
+            <span className="text-xs text-slate-500 dark:text-slate-400">Sorted by {sortBy} · {sortDir}</span>
           </div>
 
           {loading ? (
@@ -332,13 +391,13 @@ export default function Dashboard() {
             </div>
           ) : filteredSortedSignals.length === 0 ? (
             <div className="text-center py-12">
-              <Activity className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500">No signals for current filters.</p>
+              <Activity className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+              <p className="text-slate-500 dark:text-slate-400">No signals for current filters.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                <thead className="bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
                   <tr>
                     <th className="text-left px-4 py-2 w-10"></th>
                     <th className="text-left px-4 py-2">Time</th>
@@ -360,26 +419,26 @@ export default function Dashboard() {
                       ? 'text-red-700'
                       : 'text-slate-700';
                     return (
-                      <tr key={s.id} className="border-b last:border-0 hover:bg-slate-50">
+                      <tr key={s.id} className="border-b dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-700">
                         <td className="px-4 py-2">
                           <button onClick={() => toggleWatchlist(s.symbol)} aria-label="Toggle watchlist">
                             {watchlist.has(s.symbol) ? (
                               <Star className="w-4 h-4 text-amber-500" />
                             ) : (
-                              <StarOff className="w-4 h-4 text-slate-400" />
+                              <StarOff className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                             )}
                           </button>
                         </td>
-                        <td className="px-4 py-2 text-slate-600">{new Date(s.timestamp).toLocaleString()}</td>
-                        <td className="px-4 py-2 font-semibold text-slate-900">{s.symbol}</td>
+                        <td className="px-4 py-2 text-slate-600 dark:text-slate-400">{new Date(s.timestamp).toLocaleString()}</td>
+                        <td className="px-4 py-2 font-semibold text-slate-900 dark:text-slate-100">{s.symbol}</td>
                         <td className={`px-4 py-2 font-medium ${rowColor}`}>{s.signal_type.replace('_', ' ')}</td>
                         <td className="px-4 py-2">
                           {getSystemBadge(s.system)}
                         </td>
                         <td className="px-4 py-2">
-                          <span className="inline-flex items-center gap-1 text-slate-800"><DollarSign className="w-3 h-3" />{s.price.toFixed(6)}</span>
+                          <span className="inline-flex items-center gap-1 text-slate-800 dark:text-slate-200"><DollarSign className="w-3 h-3" />{s.price.toFixed(6)}</span>
                         </td>
-                        <td className="px-4 py-2 max-w-[420px] truncate text-slate-600" title={s.message}>{s.message}</td>
+                        <td className="px-4 py-2 max-w-[420px] truncate text-slate-600 dark:text-slate-400" title={s.message}>{s.message}</td>
                       </tr>
                     );
                   })}
