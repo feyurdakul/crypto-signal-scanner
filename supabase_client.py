@@ -6,7 +6,7 @@ Kripto sinyalleri ve işlemler için kalıcı veri depolama
 
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import pytz
 from supabase import create_client, Client
@@ -73,11 +73,14 @@ class SupabaseManager:
             print(f"Supabase işlem açma hatası: {e}")
             return False
     
-    def close_trade(self, symbol: str, exit_price: float) -> Optional[Dict]:
+    def close_trade(self, symbol: str, exit_price: float, system: str = None) -> Optional[Dict]:
         """İşlem kapat ve kar/zarar hesapla"""
         try:
-            # Açık işlemi getir
-            open_trade_result = self.supabase.table('open_trades').select('*').eq('symbol', symbol).execute()
+            # Açık işlemi getir (opsiyonel system filtresi ile)
+            query = self.supabase.table('open_trades').select('*').eq('symbol', symbol)
+            if system:
+                query = query.eq('system', system)
+            open_trade_result = query.execute()
             
             if not open_trade_result.data:
                 print(f"Açık işlem bulunamadı: {symbol}")
@@ -102,13 +105,17 @@ class SupabaseManager:
                 'exit_price': exit_price,
                 'exit_time': datetime.now(pytz.utc).isoformat(),
                 'pnl_percent': round(pnl_percent, 2),
-                'status': 'CLOSED'
+                'status': 'CLOSED',
+                'system': system
             }
             
             closed_result = self.supabase.table('closed_trades').insert(closed_trade_data).execute()
             
-            # Açık işlemlerden sil
-            delete_result = self.supabase.table('open_trades').delete().eq('symbol', symbol).execute()
+            # Açık işlemlerden sil (opsiyonel system filtresi ile)
+            delete_query = self.supabase.table('open_trades').delete().eq('symbol', symbol)
+            if system:
+                delete_query = delete_query.eq('system', system)
+            delete_result = delete_query.execute()
             
             if len(closed_result.data) > 0:
                 return closed_trade_data
@@ -163,7 +170,8 @@ class SupabaseManager:
                     'type': row['trade_type'],
                     'entry_price': row['entry_price'],
                     'entry_time': row['entry_time'],
-                    'status': row['status']
+                    'status': row['status'],
+                    'system': row.get('system')
                 }
             
             return open_trades
@@ -187,7 +195,8 @@ class SupabaseManager:
                     'exit_price': row['exit_price'],
                     'exit_time': row['exit_time'],
                     'pnl_percent': row['pnl_percent'],
-                    'status': row['status']
+                    'status': row['status'],
+                    'system': row.get('system')
                 })
             
             return closed_trades
@@ -196,10 +205,13 @@ class SupabaseManager:
             print(f"Supabase kapalı işlem getirme hatası: {e}")
             return []
     
-    def get_position_status(self, symbol: str) -> str:
+    def get_position_status(self, symbol: str, system: str = None) -> str:
         """Sembol için pozisyon durumu"""
         try:
-            result = self.supabase.table('open_trades').select('trade_type').eq('symbol', symbol).execute()
+            query = self.supabase.table('open_trades').select('trade_type').eq('symbol', symbol)
+            if system:
+                query = query.eq('system', system)
+            result = query.execute()
             
             if result.data:
                 return result.data[0]['trade_type']
