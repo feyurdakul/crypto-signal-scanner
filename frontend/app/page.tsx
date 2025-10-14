@@ -5,9 +5,10 @@ import axios from 'axios';
 import { 
   TrendingUp, TrendingDown, Activity, DollarSign,
   Clock, BarChart3, Globe, Building2, Flag, RefreshCw,
-  Search, Star, StarOff, ArrowUpDown, Moon, Sun, X, AlertCircle
+  Search, Star, StarOff, ArrowUpDown, Moon, Sun, X, AlertCircle,
+  Copy, Check, ChevronDown, Filter
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -34,7 +35,7 @@ export default function Dashboard() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [marketStats, setMarketStats] = useState<any>({});
   const [markets, setMarkets] = useState<Record<string, MarketStatus>>({});
-  const [selectedMarket, setSelectedMarket] = useState('CRYPTO');
+  const [selectedMarket, setSelectedMarket] = useState('ALL');
   const [selectedSystem, setSelectedSystem] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,14 +47,15 @@ export default function Dashboard() {
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
   const [darkMode, setDarkMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5000); // Her 5 saniyede güncelle
+    const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
   }, [selectedMarket, selectedSystem]);
 
-  // Load watchlist from localStorage
   useEffect(() => {
     try {
       const raw = localStorage.getItem('watchlist');
@@ -61,14 +63,12 @@ export default function Dashboard() {
     } catch {}
   }, []);
 
-  // Persist watchlist
   useEffect(() => {
     try {
       localStorage.setItem('watchlist', JSON.stringify(Array.from(watchlist)));
     } catch {}
   }, [watchlist]);
 
-  // Load dark mode preference
   useEffect(() => {
     try {
       const stored = localStorage.getItem('darkMode');
@@ -81,7 +81,6 @@ export default function Dashboard() {
     } catch {}
   }, []);
 
-  // Persist dark mode
   useEffect(() => {
     try {
       localStorage.setItem('darkMode', String(darkMode));
@@ -100,7 +99,7 @@ export default function Dashboard() {
           params: {
             market: selectedMarket !== 'ALL' ? selectedMarket : undefined,
             system: selectedSystem !== 'ALL' ? selectedSystem : undefined,
-            limit: 20
+            limit: 50
           }
         }),
         axios.get(`${API_URL}/api/signals/stats`),
@@ -136,20 +135,24 @@ export default function Dashboard() {
     });
   };
 
+  const copySignal = (signal: Signal) => {
+    const text = `${signal.symbol} - ${signal.signal_type} @ $${signal.price.toFixed(6)} - ${signal.system}`;
+    navigator.clipboard.writeText(text);
+    setCopiedId(signal.id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   const filteredSortedSignals = (() => {
     let data = signals.slice();
-    // scope
     if (signalScope === 'ENTRY') {
       data = data.filter(s => s.signal_type.includes('ENTRY'));
     } else if (signalScope === 'EXIT') {
       data = data.filter(s => s.signal_type.includes('EXIT'));
     }
-    // search
     const q = searchQuery.trim().toLowerCase();
     if (q) {
       data = data.filter(s => s.symbol.toLowerCase().includes(q));
     }
-    // sort
     data.sort((a, b) => {
       let cmp = 0;
       if (sortBy === 'timestamp') {
@@ -161,7 +164,6 @@ export default function Dashboard() {
       }
       return sortDir === 'asc' ? cmp : -cmp;
     });
-    // pin watchlist symbols to top
     if (watchlist.size > 0) {
       data.sort((a, b) => {
         const ai = watchlist.has(a.symbol) ? 0 : 1;
@@ -177,269 +179,364 @@ export default function Dashboard() {
     const total = signals.length;
     const entries = signals.filter(s => s.signal_type.includes('ENTRY')).length;
     const exits = signals.filter(s => s.signal_type.includes('EXIT')).length;
-    return { total, entries, exits };
+    const longEntries = signals.filter(s => s.signal_type.includes('LONG_ENTRY')).length;
+    const shortEntries = signals.filter(s => s.signal_type.includes('SHORT_ENTRY')).length;
+    return { total, entries, exits, longEntries, shortEntries };
   })();
 
-  const getSignalColor = (signalType: string) => {
-    if (signalType.includes('LONG_ENTRY')) return 'text-green-600 bg-green-50 border-green-200';
-    if (signalType.includes('SHORT_ENTRY')) return 'text-red-600 bg-red-50 border-red-200';
-    if (signalType.includes('LONG_EXIT')) return 'text-orange-600 bg-orange-50 border-orange-200';
-    if (signalType.includes('SHORT_EXIT')) return 'text-blue-600 bg-blue-50 border-blue-200';
-    return 'text-gray-600 bg-gray-50 border-gray-200';
+  const getSignalBadgeClass = (signalType: string) => {
+    if (signalType.includes('LONG_ENTRY')) return 'bg-emerald-500 text-white';
+    if (signalType.includes('SHORT_ENTRY')) return 'bg-rose-500 text-white';
+    if (signalType.includes('LONG_EXIT')) return 'bg-amber-500 text-white';
+    if (signalType.includes('SHORT_EXIT')) return 'bg-sky-500 text-white';
+    return 'bg-gray-500 text-white';
   };
 
   const getSystemBadge = (system: string) => {
     if (system.includes('HYBRID')) {
-      return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300">HYBRID</span>;
+      return <span className="px-2 py-0.5 text-xs font-bold rounded bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm">HYBRID</span>;
     }
     if (system.includes('ELLIOTT')) {
-      return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">ELLIOTT</span>;
+      return <span className="px-2 py-0.5 text-xs font-bold rounded bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-sm">ELLIOTT</span>;
     }
     return null;
   };
 
-  const getMarketIcon = (market: string) => {
-    switch (market) {
-      case 'CRYPTO': return <Globe className="w-5 h-5" />;
-      case 'BIST': return <Building2 className="w-5 h-5" />;
-      case 'US': return <Flag className="w-5 h-5" />;
-      default: return <Activity className="w-5 h-5" />;
-    }
+  const getMarketBadge = (market: string) => {
+    const colors: Record<string, string> = {
+      'CRYPTO': 'bg-gradient-to-r from-purple-500 to-pink-500',
+      'BIST': 'bg-gradient-to-r from-red-500 to-orange-500',
+      'US': 'bg-gradient-to-r from-blue-600 to-indigo-600'
+    };
+    return <span className={`px-2 py-0.5 text-xs font-bold rounded ${colors[market] || 'bg-gray-500'} text-white shadow-sm`}>{market}</span>;
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      {/* Error Banner */}
-      {error && (
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800 px-4 py-3"
-        >
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
-              <span className="text-sm text-red-700 dark:text-red-300">{error}</span>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      <AnimatePresence>
+        {error && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-gradient-to-r from-red-500 to-rose-600 border-b border-red-600 px-4 py-3 shadow-lg"
+          >
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-white" />
+                <span className="text-sm font-medium text-white">{error}</span>
+              </div>
+              <button 
+                onClick={() => setError(null)} 
+                className="text-white hover:text-red-100 transition-colors"
+                aria-label="Dismiss error"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <button 
-              onClick={() => setError(null)} 
-              className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
-              aria-label="Dismiss error"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </motion.div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Header */}
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+      <header className="bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border-b border-slate-600 dark:border-slate-700 shadow-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-600 rounded-lg">
-                <BarChart3 className="w-6 h-6 text-white" />
+              <div className="p-2.5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl shadow-lg">
+                <BarChart3 className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Trading Signal Dashboard</h1>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Real-time market analysis</p>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">SIGNAL ▶ START</h1>
+                <p className="text-xs text-slate-300">Professional Trading Signals</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => setDarkMode(!darkMode)}
-                className="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-600/50 transition-colors border border-slate-600"
                 aria-label="Toggle dark mode"
               >
-                {darkMode ? <Sun className="w-5 h-5 text-slate-900 dark:text-slate-100" /> : <Moon className="w-5 h-5 text-slate-900" />}
+                {darkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-slate-300" />}
               </button>
-              <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg ${
-                scannerStatus === 'online' ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
+              <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg border ${
+                scannerStatus === 'online' 
+                  ? 'bg-emerald-500/20 border-emerald-500/50' 
+                  : 'bg-rose-500/20 border-rose-500/50'
               }`}>
                 <div className={`w-2 h-2 rounded-full ${
-                  scannerStatus === 'online' ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+                  scannerStatus === 'online' ? 'bg-emerald-400 animate-pulse shadow-lg shadow-emerald-500/50' : 'bg-rose-400'
                 }`}></div>
-                <span className={`text-sm font-medium ${
-                  scannerStatus === 'online' ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'
+                <span className={`text-xs font-bold ${
+                  scannerStatus === 'online' ? 'text-emerald-300' : 'text-rose-300'
                 }`}>
-                  Scanner: {scannerStatus}
+                  {scannerStatus.toUpperCase()}
                 </span>
               </div>
               <button
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg font-medium text-sm"
               >
                 <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-                <span className="text-sm font-medium">Yenile</span>
+                <span>Refresh</span>
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Market Tabs + KPIs */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-2">
-            {['CRYPTO', 'BIST', 'US'].map(m => (
-              <button
-                key={m}
-                onClick={() => setSelectedMarket(m)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${selectedMarket === m ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-              >
-                <span className="inline-flex items-center space-x-1">
-                  {getMarketIcon(m)}
-                  <span>{m}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-              <div className="text-xs text-slate-500 dark:text-slate-400">Signals</div>
-              <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{kpi.total}</div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-lg border border-slate-200 dark:border-slate-700"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Total Signals</span>
+              <Activity className="w-4 h-4 text-blue-500" />
             </div>
-            <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-              <div className="text-xs text-slate-500 dark:text-slate-400">Entries</div>
-              <div className="text-lg font-semibold text-green-700 dark:text-green-400">{kpi.entries}</div>
+            <div className="text-2xl font-bold text-slate-900 dark:text-white">{kpi.total}</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Last 24h</div>
+          </motion.div>
+
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl p-4 shadow-lg"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-emerald-100 uppercase">Long Entries</span>
+              <TrendingUp className="w-4 h-4 text-white" />
             </div>
-            <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-              <div className="text-xs text-slate-500 dark:text-slate-400">Exits</div>
-              <div className="text-lg font-semibold text-slate-700 dark:text-slate-300">{kpi.exits}</div>
+            <div className="text-2xl font-bold text-white">{kpi.longEntries}</div>
+            <div className="text-xs text-emerald-100 mt-1">Buy Signals</div>
+          </motion.div>
+
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            className="bg-gradient-to-br from-rose-500 to-red-600 rounded-xl p-4 shadow-lg"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-rose-100 uppercase">Short Entries</span>
+              <TrendingDown className="w-4 h-4 text-white" />
             </div>
-          </div>
+            <div className="text-2xl font-bold text-white">{kpi.shortEntries}</div>
+            <div className="text-xs text-rose-100 mt-1">Sell Signals</div>
+          </motion.div>
+
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl p-4 shadow-lg"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-amber-100 uppercase">Exits</span>
+              <Clock className="w-4 h-4 text-white" />
+            </div>
+            <div className="text-2xl font-bold text-white">{kpi.exits}</div>
+            <div className="text-xs text-amber-100 mt-1">Close Signals</div>
+          </motion.div>
+
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            className="bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl p-4 shadow-lg"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-purple-100 uppercase">Watchlist</span>
+              <Star className="w-4 h-4 text-white" />
+            </div>
+            <div className="text-2xl font-bold text-white">{watchlist.size}</div>
+            <div className="text-xs text-purple-100 mt-1">Favorites</div>
+          </motion.div>
         </div>
 
-        {/* Filters Bar */}
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 mb-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div className="flex-1 flex items-center gap-2">
-              <div className="relative w-full md:max-w-sm">
+        {/* Search & Filters */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 p-4 mb-6">
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* Search */}
+            <div className="flex-1">
+              <div className="relative">
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search symbol..."
-                  className="w-full pl-9 pr-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
+                  placeholder="Search signals..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border-2 border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm font-medium outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
                 />
-                <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-2.5 top-2.5" />
-              </div>
-              <div className="flex items-center gap-2">
-                {['ALL', 'ENTRY', 'EXIT'].map(scope => (
-                  <button
-                    key={scope}
-                    onClick={() => setSignalScope(scope as any)}
-                    className={`px-3 py-1.5 rounded-md text-sm border ${signalScope === scope ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                  >{scope}</button>
-                ))}
+                <Search className="w-5 h-5 text-slate-400 absolute left-3 top-2.5" />
               </div>
             </div>
+
+            {/* Market Tabs */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {['ALL', 'CRYPTO', 'BIST', 'US'].map(m => (
+                <button
+                  key={m}
+                  onClick={() => setSelectedMarket(m)}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                    selectedMarket === m 
+                      ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg scale-105' 
+                      : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+
+            {/* System Filter */}
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => { setSortBy('timestamp'); setSortDir(sortBy === 'timestamp' && sortDir === 'desc' ? 'asc' : 'desc'); }}
-                className={`px-3 py-1.5 rounded-md text-sm border ${sortBy === 'timestamp' ? 'border-blue-600 text-blue-700 dark:text-blue-400 dark:border-blue-500' : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                title="Sort by time"
-              >
-                <span className="inline-flex items-center gap-1">Time <ArrowUpDown className="w-4 h-4" /></span>
-              </button>
-              <button
-                onClick={() => { setSortBy('symbol'); setSortDir(sortBy === 'symbol' && sortDir === 'asc' ? 'desc' : 'asc'); }}
-                className={`px-3 py-1.5 rounded-md text-sm border ${sortBy === 'symbol' ? 'border-blue-600 text-blue-700 dark:text-blue-400 dark:border-blue-500' : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                title="Sort by symbol"
-              >
-                <span className="inline-flex items-center gap-1">Symbol <ArrowUpDown className="w-4 h-4" /></span>
-              </button>
-              <button
-                onClick={() => { setSortBy('price'); setSortDir(sortBy === 'price' && sortDir === 'asc' ? 'desc' : 'asc'); }}
-                className={`px-3 py-1.5 rounded-md text-sm border ${sortBy === 'price' ? 'border-blue-600 text-blue-700 dark:text-blue-400 dark:border-blue-500' : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                title="Sort by price"
-              >
-                <span className="inline-flex items-center gap-1">Price <ArrowUpDown className="w-4 h-4" /></span>
-              </button>
+              {['ALL', 'HYBRID', 'ELLIOTT'].map(sys => (
+                <button
+                  key={sys}
+                  onClick={() => setSelectedSystem(sys)}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                    selectedSystem === sys
+                      ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg'
+                      : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                  }`}
+                >
+                  {sys}
+                </button>
+              ))}
+            </div>
+
+            {/* Signal Type Filter */}
+            <div className="flex items-center gap-2">
+              {['ALL', 'ENTRY', 'EXIT'].map(scope => (
+                <button
+                  key={scope}
+                  onClick={() => setSignalScope(scope as any)}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
+                    signalScope === scope
+                      ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-lg'
+                      : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                  }`}
+                >
+                  {scope}
+                </button>
+              ))}
             </div>
           </div>
-        </div>
-
-        {/* System Filter */}
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-sm text-slate-600 dark:text-slate-400">System:</span>
-          {['ALL', 'HYBRID', 'ELLIOTT'].map((system) => (
-            <button
-              key={system}
-              onClick={() => setSelectedSystem(system)}
-              className={`px-3 py-1.5 rounded-md text-sm border ${
-                selectedSystem === system
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
-              }`}
-            >
-              {system}
-            </button>
-          ))}
         </div>
 
         {/* Signals Table */}
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Live Signals ({filteredSortedSignals.length})</h2>
-            <span className="text-xs text-slate-500 dark:text-slate-400">Sorted by {sortBy} · {sortDir}</span>
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white uppercase tracking-wide">Trading Signals</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Real-time market opportunities</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">
+                  Showing <span className="text-blue-600 dark:text-blue-400 font-bold">{filteredSortedSignals.length}</span> signals
+                </span>
+              </div>
+            </div>
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <div className="flex items-center justify-center py-20">
+              <div className="relative">
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-slate-200 dark:border-slate-700"></div>
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-t-blue-600 border-r-transparent border-b-transparent border-l-transparent absolute top-0 left-0"></div>
+              </div>
             </div>
           ) : filteredSortedSignals.length === 0 ? (
-            <div className="text-center py-12">
-              <Activity className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-              <p className="text-slate-500 dark:text-slate-400">No signals for current filters.</p>
+            <div className="text-center py-20">
+              <Activity className="w-16 h-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+              <p className="text-lg font-semibold text-slate-600 dark:text-slate-400">No signals found</p>
+              <p className="text-sm text-slate-500 dark:text-slate-500 mt-2">Try adjusting your filters</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+              <table className="w-full">
+                <thead className="bg-slate-100 dark:bg-slate-900 border-b-2 border-slate-200 dark:border-slate-700">
                   <tr>
-                    <th className="text-left px-4 py-2 w-10"></th>
-                    <th className="text-left px-4 py-2">Time</th>
-                    <th className="text-left px-4 py-2">Symbol</th>
-                    <th className="text-left px-4 py-2">Type</th>
-                    <th className="text-left px-4 py-2">System</th>
-                    <th className="text-left px-4 py-2">Price</th>
-                    <th className="text-left px-4 py-2">Message</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider w-12">Rank</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Symbol</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Signal</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">System</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Market</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Price</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Time</th>
+                    <th className="text-center px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider w-24">Action</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {filteredSortedSignals.map((s) => {
-                    const isEntryLong = s.signal_type.includes('LONG_ENTRY');
-                    const isEntryShort = s.signal_type.includes('SHORT_ENTRY');
-                    const isExit = s.signal_type.includes('EXIT');
-                    const rowColor = isEntryLong
-                      ? 'text-green-700'
-                      : isEntryShort
-                      ? 'text-red-700'
-                      : 'text-slate-700';
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                  {filteredSortedSignals.map((s, idx) => {
+                    const isWatched = watchlist.has(s.symbol);
+                    const market = s.system.split('_')[1] || 'CRYPTO';
                     return (
-                      <tr key={s.id} className="border-b dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-700">
-                        <td className="px-4 py-2">
-                          <button onClick={() => toggleWatchlist(s.symbol)} aria-label="Toggle watchlist">
-                            {watchlist.has(s.symbol) ? (
-                              <Star className="w-4 h-4 text-amber-500" />
+                      <motion.tr 
+                        key={s.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.02 }}
+                        className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${isWatched ? 'bg-amber-50 dark:bg-amber-900/10' : ''}`}
+                      >
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-slate-400 dark:text-slate-500">{idx + 1}</span>
+                            <button 
+                              onClick={() => toggleWatchlist(s.symbol)} 
+                              className="hover:scale-110 transition-transform"
+                              aria-label="Toggle watchlist"
+                            >
+                              {isWatched ? (
+                                <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                              ) : (
+                                <StarOff className="w-4 h-4 text-slate-300 dark:text-slate-600" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="text-sm font-bold text-slate-900 dark:text-white">{s.symbol}</span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${getSignalBadgeClass(s.signal_type)} shadow-sm`}>
+                            {s.signal_type.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          {getSystemBadge(s.system)}
+                        </td>
+                        <td className="px-4 py-4">
+                          {getMarketBadge(market)}
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <span className="text-sm font-bold text-slate-900 dark:text-white">${s.price.toFixed(6)}</span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
+                            {new Date(s.timestamp).toLocaleString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <button
+                            onClick={() => copySignal(s)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+                          >
+                            {copiedId === s.id ? (
+                              <>
+                                <Check className="w-3 h-3" />
+                                <span>Copied</span>
+                              </>
                             ) : (
-                              <StarOff className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>Copy</span>
+                              </>
                             )}
                           </button>
                         </td>
-                        <td className="px-4 py-2 text-slate-600 dark:text-slate-400">{new Date(s.timestamp).toLocaleString()}</td>
-                        <td className="px-4 py-2 font-semibold text-slate-900 dark:text-slate-100">{s.symbol}</td>
-                        <td className={`px-4 py-2 font-medium ${rowColor}`}>{s.signal_type.replace('_', ' ')}</td>
-                        <td className="px-4 py-2">
-                          {getSystemBadge(s.system)}
-                        </td>
-                        <td className="px-4 py-2">
-                          <span className="inline-flex items-center gap-1 text-slate-800 dark:text-slate-200"><DollarSign className="w-3 h-3" />{s.price.toFixed(6)}</span>
-                        </td>
-                        <td className="px-4 py-2 max-w-[420px] truncate text-slate-600 dark:text-slate-400" title={s.message}>{s.message}</td>
-                      </tr>
+                      </motion.tr>
                     );
                   })}
                 </tbody>
@@ -447,8 +544,14 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* Footer Info */}
+        <div className="mt-6 text-center">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Auto-refreshing every 5 seconds • Last update: {new Date().toLocaleTimeString()}
+          </p>
+        </div>
       </div>
     </div>
   );
 }
-
