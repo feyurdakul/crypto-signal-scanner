@@ -2,31 +2,35 @@
 Intraday Trading Strategy (VWAP + ADX + RSI)
 ============================================
 
-Bu strateji, VWAP, ADX ve RSI göstergelerini kullanarak gün içi momentum takibi yapar.
+TradingView Original Strategy - Tam Uyumlu Versiyon
 
 BUY RULES:
-1. Fiyat VWAP üzerinde kapanmalı
-2. ADX 30'un altında olmalı
-3. RSI 55'i yukarı kesip üzerinde kapanmalı
+1. Prices should close above the VWAP
+2. ADX should be below the 30 level
+3. RSI should cross and close above the 55 level
 
 SELL RULES:
-1. Fiyat VWAP altında kapanmalı
-2. ADX 30'un altında olmalı
-3. RSI 35'i aşağı kesip altında kapanmalı
+1. Prices should close below the VWAP
+2. ADX should be below the 30 level
+3. RSI should cross and close below the 35 level
 
-EXIT RULES:
-- BUY EXIT: Fiyat VWAP altına düşerse veya square off zamanında otomatik kapat
-- SELL EXIT: Fiyat VWAP üzerine çıkarsa veya square off zamanında otomatik kapat
+BUY EXIT RULES:
+1. Prices should close below the VWAP or after 15:00 the buy position will automatically get squared off
 
-İşlem Saatleri:
+SELL EXIT RULES:
+1. Prices should close above the VWAP or after 15:00 the sell position will automatically get squared off
+
+İşlem Saatleri (TradingView Original: 09:15-14:30):
 - CRYPTO: 7/24 (Her zaman açık)
-- BIST: 10:00-17:00 TR (Hafta içi)
-- US: 09:30-16:00 ET (Hafta içi)
+- BIST: 09:15-14:30 TR (Hafta içi)
+- US: 09:15-14:30 ET (Hafta içi)
 
-Square Off:
+Square Off (TradingView Original: 14:45-15:00):
 - CRYPTO: Yok (7/24 çalışır)
-- BIST: 18:00 TR (Tüm pozisyonlar otomatik kapanır)
-- US: 16:00 ET (Market kapanışında otomatik kapanır)
+- BIST: 15:00 TR (Tüm pozisyonlar otomatik kapanır)
+- US: 15:00 ET (Tüm pozisyonlar otomatik kapanır)
+
+Timeframe: 15 dakika
 """
 
 import pandas as pd
@@ -63,16 +67,16 @@ class HybridIntradayStrategy:
             self.SQUARE_OFF_TIME = None
             self.TIMEZONE = None
         elif market_type == 'BIST':
-            # BIST: 10:00-17:00 TR, Square Off: 18:00 TR
-            self.TRADING_START_TIME = "10:00"
-            self.TRADING_END_TIME = "17:00"
-            self.SQUARE_OFF_TIME = "18:00"
+            # BIST: 09:15-14:30 TR (TradingView original), Square Off: 14:45-15:00 TR
+            self.TRADING_START_TIME = "09:15"
+            self.TRADING_END_TIME = "14:30"
+            self.SQUARE_OFF_TIME = "15:00"
             self.TIMEZONE = 'Europe/Istanbul'
         else:  # US
-            # US: 09:30-16:00 ET, Square Off: 16:00 ET (market kapanışı)
-            self.TRADING_START_TIME = "09:30"
-            self.TRADING_END_TIME = "16:00"
-            self.SQUARE_OFF_TIME = "16:00"
+            # US: 09:15-14:30 ET (same as BIST logic), Square Off: 15:00 ET
+            self.TRADING_START_TIME = "09:15"
+            self.TRADING_END_TIME = "14:30"
+            self.SQUARE_OFF_TIME = "15:00"
             self.TIMEZONE = 'America/New_York'
         
         print(f"🎯 Hibrit Strateji başlatıldı: {symbol} ({market_type})")
@@ -170,12 +174,12 @@ class HybridIntradayStrategy:
             'close': round(latest['Close'], 6)
         }
         
-        # ZAMAN TABANLI ÇIKIŞ - Square Off (Sadece BIST için 18:00 TR)
+        # ZAMAN TABANLI ÇIKIŞ - Square Off (15:00 için)
         if self.is_square_off_time():
             if current_position == 'LONG':
-                return 'LONG_EXIT', "🚪 18:00 SQUARE OFF - UZUN POZİSYON KAPAT", indicators
+                return 'LONG_EXIT', "🚪 15:00 SQUARE OFF - UZUN POZİSYON KAPAT", indicators
             elif current_position == 'SHORT':
-                return 'SHORT_EXIT', "🚪 18:00 SQUARE OFF - KISA POZİSYON KAPAT", indicators
+                return 'SHORT_EXIT', "🚪 15:00 SQUARE OFF - KISA POZİSYON KAPAT", indicators
         
         # AÇIK POZİSYON VARSA - ÇIKIŞ SİNYALLERİ
         if current_position == 'LONG':
@@ -195,30 +199,48 @@ class HybridIntradayStrategy:
         if not self.is_trading_time():
             return None, None, indicators
         
-        # BUY RULES (Esnek versiyon - daha fazla sinyal için)
+        # BUY RULES (TradingView original koduna göre - Esnek crossover)
         # 1. Fiyat VWAP üzerinde kapanmalı
         buy_vwap = latest['Close'] > latest['VWAP']
         
-        # 2. ADX 30'un altında olmalı (düşük volatilite)
+        # 2. ADX 30'un altında olmalı
         buy_adx = latest['ADX'] < self.ADX_LEVEL
         
-        # 3. RSI 55'in üzerinde (momentum var)
-        buy_rsi = latest['RSI'] > self.RSI_BUY_LEVEL
+        # 3. RSI 55'i yukarı kesip üzerinde kapanmalı (crossover)
+        # Esnek: Son 3 mumdan birinde kesme varsa kabul et
+        buy_rsi_cross = False
+        if len(self.df) >= 3:
+            for i in range(1, 4):  # Son 3 mumu kontrol et
+                if i < len(self.df):
+                    prev_rsi = self.df.iloc[-(i+1)]['RSI']
+                    curr_rsi = self.df.iloc[-i]['RSI']
+                    if prev_rsi <= self.RSI_BUY_LEVEL and curr_rsi > self.RSI_BUY_LEVEL:
+                        buy_rsi_cross = True
+                        break
         
-        if buy_vwap and buy_adx and buy_rsi:
-            return 'LONG_ENTRY', "📈 ALIM SİNYALİ", indicators
+        if buy_vwap and buy_adx and buy_rsi_cross:
+            return 'LONG_ENTRY', "📈 ALIM SİNYALİ - RSI CROSS UP 55", indicators
         
-        # SELL RULES (Esnek versiyon - daha fazla sinyal için)
+        # SELL RULES (TradingView original koduna göre - Esnek crossunder)
         # 1. Fiyat VWAP altında kapanmalı
         sell_vwap = latest['Close'] < latest['VWAP']
         
-        # 2. ADX 30'un altında olmalı (düşük volatilite)
+        # 2. ADX 30'un altında olmalı
         sell_adx = latest['ADX'] < self.ADX_LEVEL
         
-        # 3. RSI 35'in altında (zayıf momentum)
-        sell_rsi = latest['RSI'] < self.RSI_SELL_LEVEL
+        # 3. RSI 35'i aşağı kesip altında kapanmalı (crossunder)
+        # Esnek: Son 3 mumdan birinde kesme varsa kabul et
+        sell_rsi_cross = False
+        if len(self.df) >= 3:
+            for i in range(1, 4):  # Son 3 mumu kontrol et
+                if i < len(self.df):
+                    prev_rsi = self.df.iloc[-(i+1)]['RSI']
+                    curr_rsi = self.df.iloc[-i]['RSI']
+                    if prev_rsi >= self.RSI_SELL_LEVEL and curr_rsi < self.RSI_SELL_LEVEL:
+                        sell_rsi_cross = True
+                        break
         
-        if sell_vwap and sell_adx and sell_rsi:
-            return 'SHORT_ENTRY', "📉 SATIM SİNYALİ", indicators
+        if sell_vwap and sell_adx and sell_rsi_cross:
+            return 'SHORT_ENTRY', "📉 SATIM SİNYALİ - RSI CROSS DOWN 35", indicators
         
         return None, None, indicators
