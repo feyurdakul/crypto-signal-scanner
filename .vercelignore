@@ -1,0 +1,15 @@
+__pycache__/
+*.py
+*.pyc
+*.pyo
+*.log
+requirements.txt
+Procfile
+railway.json
+start_railway.sh
+backend_api.py
+main.py
+scanner_core.py
+*.md
+!frontend/**
+
