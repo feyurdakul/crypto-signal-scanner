@@ -195,30 +195,30 @@ class HybridIntradayStrategy:
         if not self.is_trading_time():
             return None, None, indicators
         
-        # BUY RULES (TradingView koduna göre)
+        # BUY RULES (Esnek versiyon - daha fazla sinyal için)
         # 1. Fiyat VWAP üzerinde kapanmalı
         buy_vwap = latest['Close'] > latest['VWAP']
         
-        # 2. ADX 30'un altında olmalı
+        # 2. ADX 30'un altında olmalı (düşük volatilite)
         buy_adx = latest['ADX'] < self.ADX_LEVEL
         
-        # 3. RSI 55'i yukarı kesip üzerinde kapanmalı (crossover)
-        buy_rsi_cross = prev['RSI'] <= self.RSI_BUY_LEVEL and latest['RSI'] > self.RSI_BUY_LEVEL
+        # 3. RSI 55'in üzerinde (momentum var)
+        buy_rsi = latest['RSI'] > self.RSI_BUY_LEVEL
         
-        if buy_vwap and buy_adx and buy_rsi_cross:
+        if buy_vwap and buy_adx and buy_rsi:
             return 'LONG_ENTRY', "📈 ALIM SİNYALİ", indicators
         
-        # SELL RULES (TradingView koduna göre)
+        # SELL RULES (Esnek versiyon - daha fazla sinyal için)
         # 1. Fiyat VWAP altında kapanmalı
         sell_vwap = latest['Close'] < latest['VWAP']
         
-        # 2. ADX 30'un altında olmalı
+        # 2. ADX 30'un altında olmalı (düşük volatilite)
         sell_adx = latest['ADX'] < self.ADX_LEVEL
         
-        # 3. RSI 35'i aşağı kesip altında kapanmalı (crossunder)
-        sell_rsi_cross = prev['RSI'] >= self.RSI_SELL_LEVEL and latest['RSI'] < self.RSI_SELL_LEVEL
+        # 3. RSI 35'in altında (zayıf momentum)
+        sell_rsi = latest['RSI'] < self.RSI_SELL_LEVEL
         
-        if sell_vwap and sell_adx and sell_rsi_cross:
+        if sell_vwap and sell_adx and sell_rsi:
             return 'SHORT_ENTRY', "📉 SATIM SİNYALİ", indicators
         
         return None, None, indicators
