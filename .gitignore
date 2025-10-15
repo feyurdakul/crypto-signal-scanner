@@ -33,11 +33,15 @@ env/
 *~
 
 # Local data
-*.json
 *.log
 scanner.log
 trading_signals.json
 trade_history.json
+# Allow package.json and package-lock.json
+!package.json
+!package-lock.json
+!frontend/package.json
+!frontend/package-lock.json
 
 # Environment variables
 .env
@@ -52,3 +56,4 @@ Thumbs.db
 .vercel
 frontend/node_modules/
 frontend/.vercel/
+frontend/.next/
