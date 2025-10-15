@@ -51,3 +51,4 @@ Thumbs.db
 .streamlit/secrets.toml
 .vercel
 frontend/node_modules/
+frontend/.vercel/
