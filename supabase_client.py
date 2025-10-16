@@ -208,8 +208,7 @@ class SupabaseManager:
 
         except Exception as e:
             print(f"Supabase pozisyon durumu getirme hatası: {e}")
-            return 'NONE'</search>
-</search_and_replace>
+            return 'NONE'
     
     def get_summary(self) -> Dict:
         """Özet istatistikler"""
