@@ -15,6 +15,12 @@ from datetime import datetime
 import pytz
 from supabase_client import SupabaseManager
 import asyncio
+import threading
+from typing import Optional as _Optional  # avoid shadowing
+
+# Lazy import to avoid heavy module load during import time
+scanner_thread = None
+scanner_instance = None
 
 app = FastAPI(
     title="Trading Signal API",
@@ -33,6 +39,33 @@ app.add_middleware(
 
 # Supabase manager
 supabase = SupabaseManager()
+
+# Scanner lifecycle hooks
+@app.on_event("startup")
+async def start_scanner_background():
+    global scanner_thread, scanner_instance
+    if scanner_thread is None or not scanner_thread.is_alive():
+        try:
+            from scanner_core import CryptoScanner  # local import to avoid circular issues
+            scanner_instance = CryptoScanner()
+            # Initialize synchronously
+            scanner_instance.initialize()
+            # Start in background thread
+            scanner_thread = threading.Thread(target=scanner_instance.start, daemon=True)
+            scanner_thread.start()
+            print("✓ Scanner started in background thread.")
+        except Exception as e:
+            print(f"⚠️ Scanner startup failed: {e}")
+
+@app.on_event("shutdown")
+async def stop_scanner_background():
+    global scanner_instance
+    try:
+        if scanner_instance is not None:
+            scanner_instance.stop()
+            print("✓ Scanner stop signal sent.")
+    except Exception:
+        pass
 
 # WebSocket connections
 active_connections: List[WebSocket] = []
