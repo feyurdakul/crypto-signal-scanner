@@ -152,8 +152,9 @@ class CryptoScanner:
         self.symbols = []
         self.strategies = {}
         self.running = False
-        self.scan_interval = 60
+        self.scan_interval = 300  # 5 dakika = 300 saniye (15 dakikalık mum için optimal)
         print(f"🚀 Crypto Sinyal Tarayıcı başlatıldı! (Sadece Hybrid Strategy)")
+        print(f"⏰ Tarama aralığı: {self.scan_interval} saniye ({self.scan_interval/60:.1f} dakika)")
     
     def initialize(self):
         """Başlat"""
