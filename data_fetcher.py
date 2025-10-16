@@ -50,18 +50,18 @@ class DataFetcher:
             return None
     
     def get_all_usdt_pairs(self):
-        """Tüm USDT çiftlerini çek"""
-        try:
-            markets = self.exchange.load_markets()
-            usdt_pairs = [
-                symbol.replace('/', '') 
-                for symbol, market in markets.items() 
-                if market['quote'] == 'USDT' and market['active']
-            ]
-            return sorted(usdt_pairs)
-        except Exception as e:
-            print(f"❌ Sembol çekme hatası: {e}")
-            return []
+        """Tüm USDT çiftlerini çek - Hardcoded liste (Binance API kısıtlaması nedeniyle)"""
+        # Binance API erişimi engellendiği için hardcoded liste kullanıyoruz
+        return [
+            'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
+            'ADAUSDT', 'DOGEUSDT', 'DOTUSDT', 'MATICUSDT', 'LTCUSDT',
+            'TRXUSDT', 'AVAXUSDT', 'LINKUSDT', 'ATOMUSDT', 'UNIUSDT',
+            'ETCUSDT', 'XLMUSDT', 'FILUSDT', 'APTUSDT', 'NEARUSDT',
+            'ARBUSDT', 'OPUSDT', 'ICPUSDT', 'STXUSDT', 'INJUSDT',
+            'SUIUSDT', 'WIFUSDT', 'FETUSDT', 'IMXUSDT', 'TAOUSDT',
+            'HBARUSDT', 'TIAUSDT', 'RENDERUSDT', 'SEIUSDT', 'ARUSDT',
+            'BONKUSDT', 'PEPEUSDT', 'FLOKIUSDT', 'SHIBUSDT', '1000PEPEUSDT'
+        ]
     
     def clean_symbol_for_display(self, symbol):
         """Görüntüleme için sembol temizle (kripto için değişiklik yok)"""
