@@ -12,7 +12,7 @@ import pytz
 import threading
 from supabase_client import SupabaseManager
 from hybrid_intraday_strategy import HybridIntradayStrategy
-from data_fetcher import DataFetcher
+from data_fetcher import TVDataFetcher
 import json
 from pathlib import Path
 
@@ -148,12 +148,12 @@ class CryptoScanner:
     
     def __init__(self):
         self.data_manager = DataManager()
-        self.data_fetcher = DataFetcher()
+        self.data_fetcher = TVDataFetcher()
         self.symbols = []
         self.strategies = {}
         self.running = False
         self.scan_interval = 300  # 5 dakika = 300 saniye (15 dakikalık mum için optimal)
-        print(f"🚀 Crypto Sinyal Tarayıcı başlatıldı! (Sadece Hybrid Strategy)")
+        print(f"🚀 Crypto Sinyal Tarayıcı başlatıldı! (TVDatafeed + Hybrid Strategy)")
         print(f"⏰ Tarama aralığı: {self.scan_interval} saniye ({self.scan_interval/60:.1f} dakika)")
     
     def initialize(self):
