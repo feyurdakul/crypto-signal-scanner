@@ -69,21 +69,35 @@ class SupabaseManager:
         
     def add_signal(self, symbol: str, signal_type: str, message: str, 
                    price: float, indicators: Dict, system: str = None) -> bool:
-        """Add signal only if not duplicate"""
+        """Add signal only if not duplicate - Enhanced duplicate prevention"""
         try:
-            # Check for recent identical signal (within 5 minutes)
-            five_min_ago = (datetime.now(pytz.utc) - timedelta(minutes=5)).isoformat()
+            # Check for recent identical signal (within 10 minutes for better prevention)
+            ten_min_ago = (datetime.now(pytz.utc) - timedelta(minutes=10)).isoformat()
+            
+            # Check for any recent signal of same type for same symbol
             existing = self.supabase.table('crypto_signals')\
                 .select('*')\
                 .eq('symbol', symbol)\
                 .eq('signal_type', signal_type)\
                 .eq('system', system)\
-                .gte('timestamp', five_min_ago)\
+                .gte('timestamp', ten_min_ago)\
                 .execute()
             
             if existing.data:
-                print(f"Duplicate signal skipped: {symbol} {signal_type}")
+                print(f"Duplicate signal skipped: {symbol} {signal_type} (found {len(existing.data)} recent signals)")
                 return False
+            
+            # Additional check: If we have an open position, don't add entry signals
+            if signal_type in ['LONG_ENTRY', 'SHORT_ENTRY']:
+                open_positions = self.supabase.table('open_trades')\
+                    .select('*')\
+                    .eq('symbol', symbol)\
+                    .eq('system', system)\
+                    .execute()
+                
+                if open_positions.data:
+                    print(f"Entry signal skipped: {symbol} {signal_type} (position already open)")
+                    return False
             
             data = {
                 'symbol': symbol,
@@ -99,6 +113,7 @@ class SupabaseManager:
             }
             
             result = self.supabase.table('crypto_signals').insert(data).execute()
+            print(f"Signal added: {symbol} {signal_type} @ ${price:.6f}")
             return len(result.data) > 0
             
         except Exception as e:

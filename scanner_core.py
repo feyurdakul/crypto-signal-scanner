@@ -199,11 +199,13 @@ class CryptoScanner:
                     signal, message, indicators = strategy.generate_signal(current_position)
                     
                     if signal and message:
-                        # Prevent duplicate entry signals if already in position
+                        # Enhanced duplicate prevention
                         if current_position == 'LONG' and signal == 'LONG_ENTRY':
-                            continue  # Skip duplicate long entry
+                            print(f"Skipping duplicate LONG_ENTRY for {symbol} (already in LONG position)")
+                            continue
                         if current_position == 'SHORT' and signal == 'SHORT_ENTRY':
-                            continue  # Skip duplicate short entry
+                            print(f"Skipping duplicate SHORT_ENTRY for {symbol} (already in SHORT position)")
+                            continue
                         
                         price = indicators.get('close', 0)
                         atr_value = indicators.get('atr', 0)
@@ -213,16 +215,26 @@ class CryptoScanner:
                         
                         if success:
                             signal_count += 1
-                            # Open/close trades
+                            print(f"Processing signal: {symbol} {signal} @ ${price:.6f}")
+                            
+                            # Open/close trades with enhanced checks
                             if signal in ['LONG_ENTRY', 'SHORT_ENTRY']:
-                                self.data_manager.open_trade(
+                                trade_success = self.data_manager.open_trade(
                                     symbol, signal, price, 
                                     atr_value, 0, 0, 'HYBRID_CRYPTO'
                                 )
+                                if trade_success:
+                                    print(f"Trade opened: {symbol} {signal}")
+                                else:
+                                    print(f"Failed to open trade: {symbol} {signal}")
                             elif signal in ['LONG_EXIT', 'SHORT_EXIT']:
-                                self.data_manager.close_trade(
+                                closed_trade = self.data_manager.close_trade(
                                     symbol, price, 'HYBRID_CRYPTO'
                                 )
+                                if closed_trade:
+                                    print(f"Trade closed: {symbol} P&L: ${closed_trade.get('pnl_usd', 0):.2f}")
+                                else:
+                                    print(f"Failed to close trade: {symbol}")
                         
             except Exception as e:
                 error_count += 1
