@@ -6,7 +6,7 @@ Kripto sinyalleri ve işlemler için kalıcı veri depolama
 
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import pytz
 from supabase import create_client, Client
@@ -196,18 +196,20 @@ class SupabaseManager:
             print(f"Supabase kapalı işlem getirme hatası: {e}")
             return []
     
-    def get_position_status(self, symbol: str) -> str:
-        """Sembol için pozisyon durumu"""
+    def get_position_status(self, symbol: str, system: str = 'HYBRID_CRYPTO') -> str:
+        """Sembol için pozisyon durumu - Sistem bazlı"""
         try:
-            result = self.supabase.table('open_trades').select('trade_type').eq('symbol', symbol).execute()
-            
+            # Sistem filtresi ile sorgu yap
+            result = self.supabase.table('open_trades').select('trade_type').eq('symbol', symbol).eq('system', system).execute()
+
             if result.data:
                 return result.data[0]['trade_type']
             return 'NONE'
-            
+
         except Exception as e:
             print(f"Supabase pozisyon durumu getirme hatası: {e}")
-            return 'NONE'
+            return 'NONE'</search>
+</search_and_replace>
     
     def get_summary(self) -> Dict:
         """Özet istatistikler"""
