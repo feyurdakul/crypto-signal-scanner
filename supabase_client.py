@@ -160,6 +160,8 @@ class SupabaseManager:
     def close_trade(self, symbol: str, exit_price: float, system: str = 'HYBRID_CRYPTO') -> Optional[Dict]:
         """Close trade and calculate PnL with 5x leverage"""
         try:
+            print(f"Attempting to close trade: {symbol} @ ${exit_price}")
+            
             open_trade_result = self.supabase.table('open_trades')\
                 .select('*')\
                 .eq('symbol', symbol)\
@@ -167,14 +169,18 @@ class SupabaseManager:
                 .execute()
             
             if not open_trade_result.data:
-                print(f"Açık işlem bulunamadı: {symbol}")
+                print(f"No open trade found for {symbol} in system {system}")
                 return None
             
             trade = open_trade_result.data[0]
+            print(f"Found open trade: {trade}")
+            
             entry_price = float(trade['entry_price'])
             trade_type = trade['trade_type']
             position_size = trade.get('position_size', 50.0)
             leverage = trade.get('leverage', 5)
+            
+            print(f"Closing {trade_type} position: Entry ${entry_price}, Exit ${exit_price}")
             
             # Calculate percentage PnL
             if trade_type == 'LONG':
@@ -184,6 +190,8 @@ class SupabaseManager:
             
             # Calculate USD PnL with leverage
             pnl_usd = (pnl_percent / 100) * position_size * leverage
+            
+            print(f"Calculated P&L: {pnl_percent:.2f}% = ${pnl_usd:.2f}")
             
             closed_trade_data = {
                 'symbol': symbol,
@@ -200,14 +208,22 @@ class SupabaseManager:
                 'system': system
             }
             
+            # Insert into closed trades
             self.supabase.table('closed_trades').insert(closed_trade_data).execute()
-            self.supabase.table('open_trades').delete().eq('symbol', symbol).eq('system', system).execute()
+            print(f"Trade added to closed_trades: {closed_trade_data}")
+            
+            # Delete from open trades
+            delete_result = self.supabase.table('open_trades').delete().eq('symbol', symbol).eq('system', system).execute()
+            print(f"Deleted from open_trades: {delete_result.data}")
+            
+            # Update portfolio balance
             self.update_portfolio_balance(pnl_usd, position_size, is_opening=False)
+            print(f"Portfolio balance updated: P&L ${pnl_usd:.2f}")
             
             return closed_trade_data
             
         except Exception as e:
-            print(f"Supabase işlem kapatma hatası: {e}")
+            print(f"Error closing trade for {symbol}: {e}")
             return None
     
     def get_current_signals(self) -> Dict:

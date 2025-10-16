@@ -132,6 +132,18 @@ async def start_scanner():
     except Exception as e:
         return {"success": False, "message": f"Failed to start scanner: {str(e)}"}
 
+@app.post("/close-trade/{symbol}")
+async def close_trade_manual(symbol: str, exit_price: float):
+    """Manually close a trade for debugging"""
+    try:
+        closed_trade = supabase.close_trade(symbol, exit_price, 'HYBRID_CRYPTO')
+        if closed_trade:
+            return {"success": True, "message": f"Trade closed for {symbol}", "trade": closed_trade}
+        else:
+            return {"success": False, "message": f"No open trade found for {symbol}"}
+    except Exception as e:
+        return {"success": False, "message": f"Failed to close trade: {str(e)}"}
+
 # ----------------------------------------------------------------------
 # SIGNALS ENDPOINTS
 # ----------------------------------------------------------------------
