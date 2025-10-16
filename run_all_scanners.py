@@ -1,52 +1,37 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Tüm Tarayıcıları Başlat
-Kripto, BIST ve US tarayıcılarını paralel çalıştırır
+Crypto Scanner - Sadece Hybrid Strategy
+Railway üzerinde sürekli çalışır
 """
 
 import threading
+import time
 from scanner_core import CryptoScanner
 
 def run_crypto_scanner():
-    """Kripto tarayıcısını çalıştır"""
-    scanner = CryptoScanner(market_type='CRYPTO')
-    if scanner.initialize():
-        scanner.start()
-
-def run_bist_scanner():
-    """BIST tarayıcısını çalıştır"""
-    scanner = CryptoScanner(market_type='BIST')
-    if scanner.initialize():
-        scanner.start()
-
-def run_us_scanner():
-    """US tarayıcısını çalıştır"""
-    scanner = CryptoScanner(market_type='US')
+    """Crypto scanner'ı çalıştır"""
+    print("🚀 Crypto Scanner (Hybrid Strategy) başlatılıyor...")
+    scanner = CryptoScanner()
     if scanner.initialize():
         scanner.start()
 
 if __name__ == "__main__":
-    print("🚀 TÜM TARAYICILAR BAŞLATILIYOR...")
-    print("="*70)
+    print("\n" + "="*70)
+    print("### CRYPTO SIGNAL SCANNER - HYBRID STRATEGY ONLY ###")
+    print("="*70 + "\n")
     
-    # Kripto tarayıcısı thread
+    # Crypto scanner'ı başlat
     crypto_thread = threading.Thread(target=run_crypto_scanner, daemon=True)
     crypto_thread.start()
     
-    # BIST tarayıcısı thread
-    bist_thread = threading.Thread(target=run_bist_scanner, daemon=True)
-    bist_thread.start()
+    print("✅ Scanner başlatıldı. Railway'de 7/24 çalışıyor...")
+    print("🔄 FastAPI backend ile birlikte çalışır.")
+    print("="*70 + "\n")
     
-    # US tarayıcısı thread
-    us_thread = threading.Thread(target=run_us_scanner, daemon=True)
-    us_thread.start()
-    
-    # Ana thread'i beklet
+    # Ana thread'i canlı tut
     try:
-        crypto_thread.join()
-        bist_thread.join()
-        us_thread.join()
+        while True:
+            time.sleep(60)
     except KeyboardInterrupt:
-        print("\n\n⛔ Tüm tarayıcılar durduruldu.")
-
+        print("\n\n🛑 Scanner durduruluyor...")

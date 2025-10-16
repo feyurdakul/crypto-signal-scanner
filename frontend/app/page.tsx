@@ -366,38 +366,14 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Market Tabs */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {['ALL', 'CRYPTO', 'BIST', 'US'].map(m => (
-                <button
-                  key={m}
-                  onClick={() => setSelectedMarket(m)}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                    selectedMarket === m 
-                      ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg scale-105' 
-                      : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                  }`}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-
-            {/* System Filter */}
+            {/* Info Badge */}
             <div className="flex items-center gap-2">
-              {['ALL', 'HYBRID', 'ELLIOTT'].map(sys => (
-                <button
-                  key={sys}
-                  onClick={() => setSelectedSystem(sys)}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                    selectedSystem === sys
-                      ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg'
-                      : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                  }`}
-                >
-                  {sys}
-                </button>
-              ))}
+              <div className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-xs font-bold">
+                CRYPTO
+              </div>
+              <div className="px-4 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold">
+                HYBRID
+              </div>
             </div>
 
             {/* Signal Type Filter */}

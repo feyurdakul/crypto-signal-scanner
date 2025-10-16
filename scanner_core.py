@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Kripto Sinyal Tarayıcı - Ana Motor
+Kripto Sinyal Tarayıcı - Sadece Hybrid Intraday Strategy
 CCXT ile Binance'deki tüm USDT çiftlerini tarar
-İşlem takibi yapar (giriş/çıkış/kar-zarar)
 """
 
 import pandas as pd
@@ -13,10 +12,7 @@ import pytz
 import threading
 from supabase_client import SupabaseManager
 from hybrid_intraday_strategy import HybridIntradayStrategy
-from ewp_fibonacci_strategy import ElliottWaveFibonacciStrategy
 from data_fetcher import DataFetcher
-from bist_data_fetcher import BISTDataFetcher
-from us_data_fetcher import USDataFetcher
 import json
 from pathlib import Path
 
@@ -24,16 +20,9 @@ from pathlib import Path
 # 1. AYARLAR
 # ----------------------------------------------------------------------
 
-# Çoklu Sistem Modu - Her iki sistem aynı anda çalışır
-DUAL_SYSTEM_MODE = True
-
 # Hibrit Strateji Parametreleri
 ATR_SL_MULTIPLIER = 2.5  # Stop Loss: 2.5 x ATR
 ATR_TP_MULTIPLIER = 7.5  # Take Profit: 7.5 x ATR
-
-# Elliott Strateji Parametreleri
-EWP_ATR_SL_MULTIPLIER = 3.0  # Swing trading için daha geniş SL
-EWP_ATR_TP_MULTIPLIER = 7.5  # 1:2.5 risk/ödül oranı
 
 # ----------------------------------------------------------------------
 # 2. VERİ YÖNETİMİ
@@ -62,7 +51,7 @@ class DataManager:
             self.open_trades = {}
             self.closed_trades = []
     
-    def add_signal(self, symbol, signal_type, message, price, indicators, system='HYBRID'):
+    def add_signal(self, symbol, signal_type, message, price, indicators, system='HYBRID_CRYPTO'):
         """Yeni sinyal ekle"""
         try:
             # Supabase'e ekle
@@ -88,24 +77,18 @@ class DataManager:
         except Exception as e:
             print(f"❌ Sinyal ekleme hatası: {e}")
     
-    def open_trade(self, symbol, entry_type, entry_price, timestamp, atr_value, sl_multiplier=None, tp_multiplier=None, system='HYBRID'):
+    def open_trade(self, symbol, entry_type, entry_price, timestamp, atr_value, system='HYBRID_CRYPTO'):
         """Yeni işlem aç - ATR tabanlı SL/TP ile"""
         try:
             trade_type = 'LONG' if 'LONG' in entry_type else 'SHORT'
             
-            # ATR çarpanları
-            if sl_multiplier is None:
-                sl_multiplier = ATR_SL_MULTIPLIER
-            if tp_multiplier is None:
-                tp_multiplier = ATR_TP_MULTIPLIER
-            
             # ATR tabanlı Stop Loss ve Take Profit hesapla
             if trade_type == 'LONG':
-                stop_loss = entry_price - (atr_value * sl_multiplier)
-                take_profit = entry_price + (atr_value * tp_multiplier)
+                stop_loss = entry_price - (atr_value * ATR_SL_MULTIPLIER)
+                take_profit = entry_price + (atr_value * ATR_TP_MULTIPLIER)
             else:  # SHORT
-                stop_loss = entry_price + (atr_value * sl_multiplier)
-                take_profit = entry_price - (atr_value * tp_multiplier)
+                stop_loss = entry_price + (atr_value * ATR_SL_MULTIPLIER)
+                take_profit = entry_price - (atr_value * ATR_TP_MULTIPLIER)
             
             # Supabase'e kaydet
             success = self.supabase.open_trade(symbol, trade_type, entry_price, atr_value, stop_loss, take_profit, system)
@@ -131,7 +114,7 @@ class DataManager:
         except Exception as e:
             print(f"❌ İşlem açma hatası: {e}")
     
-    def close_trade(self, symbol, exit_type, exit_price, timestamp, system='HYBRID'):
+    def close_trade(self, symbol, exit_type, exit_price, timestamp, system='HYBRID_CRYPTO'):
         """İşlem kapat ve kar/zarar hesapla"""
         try:
             closed_trade = self.supabase.close_trade(symbol, exit_price, system)
@@ -148,7 +131,7 @@ class DataManager:
         except Exception as e:
             print(f"❌ İşlem kapatma hatası: {e}")
     
-    def get_position_status(self, symbol, system='HYBRID'):
+    def get_position_status(self, symbol, system='HYBRID_CRYPTO'):
         """Sembol için pozisyon durumu"""
         return self.supabase.get_position_status(symbol, system)
     
@@ -161,110 +144,41 @@ class DataManager:
 # ----------------------------------------------------------------------
 
 class CryptoScanner:
-    """Ana tarayıcı sınıfı - Kripto, BIST ve US"""
+    """Ana tarayıcı sınıfı - Sadece Crypto + Hybrid Strategy"""
     
-    def __init__(self, market_type='CRYPTO'):
-        self.market_type = market_type  # 'CRYPTO', 'BIST' veya 'US'
+    def __init__(self):
         self.data_manager = DataManager()
-        
-        if market_type == 'CRYPTO':
-            self.data_fetcher = DataFetcher()
-        elif market_type == 'BIST':
-            self.data_fetcher = BISTDataFetcher()
-        else:  # US
-            self.data_fetcher = USDataFetcher()
-        
+        self.data_fetcher = DataFetcher()
         self.symbols = []
-        self.hybrid_strategies = {}
-        self.elliott_strategies = {}
+        self.strategies = {}
         self.running = False
         self.scan_interval = 60
-        self.dual_system_mode = DUAL_SYSTEM_MODE
-        print(f"🚀 {market_type} Sinyal Tarayıcı başlatıldı! Mod: {'Çoklu Sistem' if self.dual_system_mode else 'Tek Sistem'}")
+        print(f"🚀 Crypto Sinyal Tarayıcı başlatıldı! (Sadece Hybrid Strategy)")
     
     def initialize(self):
         """Başlat"""
         print("\n" + "="*70)
-        print(f"### {self.market_type} SİNYAL TARAYICI - BAŞLATILIYOR ###")
+        print("### CRYPTO SİNYAL TARAYICI - HYBRID STRATEGY ###")
         print("="*70)
         
         # Sembolleri çek
-        if self.market_type == 'CRYPTO':
-            self.symbols = self.data_fetcher.get_all_usdt_pairs()
-        elif self.market_type == 'BIST':
-            self.symbols = self.data_fetcher.get_all_bist_symbols()
-        else:  # US
-            self.symbols = self.data_fetcher.get_all_us_symbols()
+        self.symbols = self.data_fetcher.get_all_usdt_pairs()
+        print(f"✓ {len(self.symbols)} kripto sembolü yüklendi")
         
-        print(f"✓ {len(self.symbols)} sembol yüklendi")
-        
-        # Her iki sistemi de oluştur
+        # Hibrit Strateji oluştur (15 dakika)
         for symbol in self.symbols:
-            # Hibrit Strateji (15 dakika) - market_type ile
-            self.hybrid_strategies[symbol] = HybridIntradayStrategy(
-                self.data_fetcher, symbol, '15m', self.market_type
-            )
-            
-            # Elliott Strateji (1 saat)
-            self.elliott_strategies[symbol] = ElliottWaveFibonacciStrategy(
-                self.data_fetcher, symbol, '1h'
+            self.strategies[symbol] = HybridIntradayStrategy(
+                self.data_fetcher, symbol, '15m', 'CRYPTO'
             )
         
         print("✓ Stratejiler hazırlandı")
         print("="*70 + "\n")
         return True
     
-    def is_market_trading_time(self):
-        """Market işlem saatlerinde mi kontrol et"""
-        if self.market_type == 'CRYPTO':
-            return True  # Kripto için her zaman True
-        
-        if self.market_type == 'BIST':
-            # TR saatine çevir (UTC+3)
-            tr_tz = pytz.timezone('Europe/Istanbul')
-            now_tr = datetime.now(tr_tz)
-            
-            # Hafta sonu kontrolü
-            if now_tr.weekday() >= 5:
-                return False
-            
-            # Saat kontrolü (10:00-17:30 TR)
-            current_time = now_tr.time()
-            start_time = datetime.strptime('10:00', '%H:%M').time()
-            end_time = datetime.strptime('17:30', '%H:%M').time()
-            
-            return start_time <= current_time <= end_time
-        
-        if self.market_type == 'US':
-            # US saatine çevir (ET = UTC-5 veya UTC-4 DST)
-            us_tz = pytz.timezone('America/New_York')
-            now_us = datetime.now(us_tz)
-            
-            # Hafta sonu kontrolü
-            if now_us.weekday() >= 5:
-                return False
-            
-            # Saat kontrolü (09:30-16:00 ET)
-            current_time = now_us.time()
-            start_time = datetime.strptime('09:30', '%H:%M').time()
-            end_time = datetime.strptime('16:00', '%H:%M').time()
-            
-            return start_time <= current_time <= end_time
-        
-        return True
-    
     def scan_once(self):
         """Tek tarama döngüsü"""
         scan_time = datetime.now(pytz.utc)
         print(f"\n[{scan_time.strftime('%Y-%m-%d %H:%M:%S UTC')}] Tarama başladı...")
-        
-        # Market işlem saatleri kontrolü
-        if not self.is_market_trading_time():
-            if self.market_type == 'BIST':
-                print(f"⏸️  BIST piyasası kapalı (Hafta içi 10:00-17:30 TR)")
-            elif self.market_type == 'US':
-                print(f"⏸️  US piyasası kapalı (Hafta içi 09:30-16:00 ET)")
-            return
         
         # Heartbeat dosyası yaz - Railway için
         self._write_heartbeat(scan_time)
@@ -273,10 +187,10 @@ class CryptoScanner:
         error_count = 0
         
         # Hibrit Sistem Taraması
-        for symbol, strategy in self.hybrid_strategies.items():
+        for symbol, strategy in self.strategies.items():
             try:
                 # Mevcut pozisyon durumunu kontrol et
-                current_position = self.data_manager.get_position_status(symbol, 'HYBRID')
+                current_position = self.data_manager.get_position_status(symbol, 'HYBRID_CRYPTO')
                 
                 # Veri çek ve analiz et
                 if strategy.fetch_data(n_bars=100):
@@ -287,22 +201,21 @@ class CryptoScanner:
                         price = indicators.get('close', 0)
                         atr_value = indicators.get('atr', 0)
                         
-                        # Sinyali kaydet (market_type ekle)
-                        display_symbol = self.data_fetcher.clean_symbol_for_display(symbol) if self.market_type == 'BIST' else symbol
-                        self.data_manager.add_signal(display_symbol, signal, message, price, indicators, f'HYBRID_{self.market_type}')
+                        # Sinyali kaydet
+                        self.data_manager.add_signal(symbol, signal, message, price, indicators, 'HYBRID_CRYPTO')
                         
                         # Giriş sinyali ise işlem aç
                         if signal in ['LONG_ENTRY', 'SHORT_ENTRY']:
                             self.data_manager.open_trade(
-                                display_symbol, signal, price, 
+                                symbol, signal, price, 
                                 datetime.now(pytz.utc).isoformat(), 
-                                atr_value, ATR_SL_MULTIPLIER, ATR_TP_MULTIPLIER, f'HYBRID_{self.market_type}'
+                                atr_value, 'HYBRID_CRYPTO'
                             )
                         # Çıkış sinyali ise işlem kapat
                         elif signal in ['LONG_EXIT', 'SHORT_EXIT']:
                             self.data_manager.close_trade(
-                                display_symbol, signal, price,
-                                datetime.now(pytz.utc).isoformat(), f'HYBRID_{self.market_type}'
+                                symbol, signal, price,
+                                datetime.now(pytz.utc).isoformat(), 'HYBRID_CRYPTO'
                             )
                         
                         signal_count += 1
@@ -310,47 +223,7 @@ class CryptoScanner:
             except Exception as e:
                 error_count += 1
                 if error_count <= 3:
-                    print(f"⚠️ [HYBRID] {symbol} hatası: {str(e)[:50]}...")
-        
-        # Elliott Sistem Taraması
-        for symbol, strategy in self.elliott_strategies.items():
-            try:
-                # Mevcut pozisyon durumunu kontrol et
-                current_position = self.data_manager.get_position_status(symbol, 'ELLIOTT')
-                
-                # Veri çek ve analiz et
-                if strategy.fetch_data(limit=500):
-                    strategy.calculate_indicators()
-                    signal, message, indicators = strategy.generate_signal(current_position)
-                    
-                    if signal and message:
-                        price = indicators.get('close', 0)
-                        atr_value = indicators.get('atr', 0)
-                        
-                        # Sinyali kaydet (market_type ekle)
-                        display_symbol = self.data_fetcher.clean_symbol_for_display(symbol) if self.market_type == 'BIST' else symbol
-                        self.data_manager.add_signal(display_symbol, signal, message, price, indicators, f'ELLIOTT_{self.market_type}')
-                        
-                        # Giriş sinyali ise işlem aç
-                        if signal in ['LONG_ENTRY', 'SHORT_ENTRY']:
-                            self.data_manager.open_trade(
-                                display_symbol, signal, price, 
-                                datetime.now(pytz.utc).isoformat(), 
-                                atr_value, EWP_ATR_SL_MULTIPLIER, EWP_ATR_TP_MULTIPLIER, f'ELLIOTT_{self.market_type}'
-                            )
-                        # Çıkış sinyali ise işlem kapat
-                        elif signal in ['LONG_EXIT', 'SHORT_EXIT']:
-                            self.data_manager.close_trade(
-                                display_symbol, signal, price,
-                                datetime.now(pytz.utc).isoformat(), f'ELLIOTT_{self.market_type}'
-                            )
-                        
-                        signal_count += 1
-                        
-            except Exception as e:
-                error_count += 1
-                if error_count <= 3:
-                    print(f"⚠️ [ELLIOTT] {symbol} hatası: {str(e)[:50]}...")
+                    print(f"⚠️ {symbol} hatası: {str(e)[:50]}...")
         
         if signal_count > 0:
             print(f"✅ {signal_count} yeni sinyal Supabase'e kaydedildi!")

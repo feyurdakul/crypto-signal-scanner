@@ -142,14 +142,12 @@ async def get_signals(
 
 @app.get("/api/signals/stats")
 async def get_signal_stats():
-    """Get signal statistics by market and system"""
+    """Get signal statistics - Crypto Hybrid only"""
     try:
         all_signals = supabase.get_current_signals()
         
         stats = {
-            "CRYPTO": {"HYBRID": 0, "ELLIOTT": 0},
-            "BIST": {"HYBRID": 0, "ELLIOTT": 0},
-            "US": {"HYBRID": 0, "ELLIOTT": 0}
+            "CRYPTO": {"HYBRID": 0}
         }
         
         for signal_data in all_signals.values():
@@ -157,21 +155,11 @@ async def get_signal_stats():
             
             if 'HYBRID_CRYPTO' in system:
                 stats["CRYPTO"]["HYBRID"] += 1
-            elif 'ELLIOTT_CRYPTO' in system:
-                stats["CRYPTO"]["ELLIOTT"] += 1
-            elif 'HYBRID_BIST' in system:
-                stats["BIST"]["HYBRID"] += 1
-            elif 'ELLIOTT_BIST' in system:
-                stats["BIST"]["ELLIOTT"] += 1
-            elif 'HYBRID_US' in system:
-                stats["US"]["HYBRID"] += 1
-            elif 'ELLIOTT_US' in system:
-                stats["US"]["ELLIOTT"] += 1
         
         return {
             "success": True,
             "stats": stats,
-            "total": sum(sum(market.values()) for market in stats.values())
+            "total": stats["CRYPTO"]["HYBRID"]
         }
         
     except Exception as e:
@@ -349,26 +337,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/api/markets")
 async def get_markets():
-    """Get available markets and their status"""
+    """Get available markets - Crypto only"""
     try:
-        tr_tz = pytz.timezone('Europe/Istanbul')
-        us_tz = pytz.timezone('America/New_York')
-        
-        now_tr = datetime.now(tr_tz)
-        now_us = datetime.now(us_tz)
-        
-        # BIST status
-        bist_open = (
-            now_tr.weekday() < 5 and
-            datetime.strptime('10:00', '%H:%M').time() <= now_tr.time() <= datetime.strptime('17:30', '%H:%M').time()
-        )
-        
-        # US status
-        us_open = (
-            now_us.weekday() < 5 and
-            datetime.strptime('09:30', '%H:%M').time() <= now_us.time() <= datetime.strptime('16:00', '%H:%M').time()
-        )
-        
         return {
             "success": True,
             "markets": {
@@ -377,20 +347,6 @@ async def get_markets():
                     "status": "open",
                     "trading_hours": "24/7",
                     "timezone": "UTC"
-                },
-                "BIST": {
-                    "name": "Borsa Istanbul",
-                    "status": "open" if bist_open else "closed",
-                    "trading_hours": "10:00-17:30 TR",
-                    "timezone": "Europe/Istanbul",
-                    "current_time": now_tr.strftime('%H:%M:%S')
-                },
-                "US": {
-                    "name": "US Stock Market",
-                    "status": "open" if us_open else "closed",
-                    "trading_hours": "09:30-16:00 ET",
-                    "timezone": "America/New_York",
-                    "current_time": now_us.strftime('%H:%M:%S')
                 }
             }
         }
