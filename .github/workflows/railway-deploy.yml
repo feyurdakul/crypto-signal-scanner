@@ -1,0 +1,29 @@
+name: Railway Auto Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install Railway CLI
+      run: |
+        npm install -g @railway/cli
+    
+    - name: Deploy to Railway
+      run: |
+        railway login --token ${{ secrets.RAILWAY_TOKEN }}
+        railway up --detach
+      env:
+        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
