@@ -49,6 +49,10 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [portfolio, setPortfolio] = useState<any>(null);
+  const [openTrades, setOpenTrades] = useState<any[]>([]);
+  const [closedTrades, setClosedTrades] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'signals' | 'open' | 'closed'>('signals');
 
   useEffect(() => {
     fetchData();
@@ -94,7 +98,7 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const [signalsRes, statsRes, marketsRes, healthRes] = await Promise.all([
+      const [signalsRes, statsRes, marketsRes, healthRes, portfolioRes, openTradesRes, closedTradesRes] = await Promise.all([
         axios.get(`${API_URL}/api/signals`, {
           params: {
             market: selectedMarket !== 'ALL' ? selectedMarket : undefined,
@@ -104,13 +108,19 @@ export default function Dashboard() {
         }),
         axios.get(`${API_URL}/api/signals/stats`),
         axios.get(`${API_URL}/api/markets`),
-        axios.get(`${API_URL}/health`)
+        axios.get(`${API_URL}/health`),
+        axios.get(`${API_URL}/api/portfolio`),
+        axios.get(`${API_URL}/api/trades/open`),
+        axios.get(`${API_URL}/api/trades/closed`)
       ]);
 
       setSignals(signalsRes.data.signals || []);
       setMarketStats(statsRes.data.stats || {});
       setMarkets(marketsRes.data.markets || {});
       setScannerStatus(healthRes.data.scanner || 'offline');
+      setPortfolio(portfolioRes.data.portfolio || null);
+      setOpenTrades(openTradesRes.data.trades || []);
+      setClosedTrades(closedTradesRes.data.trades || []);
       setLoading(false);
       setRefreshing(false);
       setError(null);
@@ -288,17 +298,57 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+          {/* Total Balance */}
           <motion.div 
             whileHover={{ scale: 1.02 }}
-            className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-lg border border-slate-200 dark:border-slate-700"
+            className="bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl p-4 shadow-lg"
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Total Signals</span>
-              <Activity className="w-4 h-4 text-blue-500" />
+              <span className="text-xs font-bold text-blue-100 uppercase">Balance</span>
+              <DollarSign className="w-4 h-4 text-white" />
             </div>
-            <div className="text-2xl font-bold text-slate-900 dark:text-white">{kpi.total}</div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Last 24h</div>
+            <div className="text-2xl font-bold text-white">${portfolio?.total_balance?.toFixed(2) || '1000.00'}</div>
+            <div className="text-xs text-blue-100 mt-1">Current Capital</div>
+          </motion.div>
+
+          {/* Available Balance */}
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-4 shadow-lg"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-green-100 uppercase">Available</span>
+              <DollarSign className="w-4 h-4 text-white" />
+            </div>
+            <div className="text-2xl font-bold text-white">${portfolio?.available_balance?.toFixed(2) || '1000.00'}</div>
+            <div className="text-xs text-green-100 mt-1">Free Capital</div>
+          </motion.div>
+
+          {/* Open Positions */}
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl p-4 shadow-lg"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-amber-100 uppercase">In Use</span>
+              <Activity className="w-4 h-4 text-white" />
+            </div>
+            <div className="text-2xl font-bold text-white">${portfolio?.used_balance?.toFixed(2) || '0.00'}</div>
+            <div className="text-xs text-amber-100 mt-1">{openTrades.length} Positions</div>
+          </motion.div>
+
+          {/* Total PnL */}
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            className={`bg-gradient-to-br ${(portfolio?.total_pnl || 0) >= 0 ? 'from-emerald-500 to-green-600' : 'from-rose-500 to-red-600'} rounded-xl p-4 shadow-lg`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-white uppercase">Total P&L</span>
+              <TrendingUp className="w-4 h-4 text-white" />
+            </div>
+            <div className="text-2xl font-bold text-white">${portfolio?.total_pnl?.toFixed(2) || '0.00'}</div>
+            <div className="text-xs text-white mt-1">{((portfolio?.total_pnl || 0) / 1000 * 100).toFixed(2)}% ROI</div>
           </motion.div>
 
           <motion.div 
@@ -323,30 +373,6 @@ export default function Dashboard() {
             </div>
             <div className="text-2xl font-bold text-white">{kpi.shortEntries}</div>
             <div className="text-xs text-rose-100 mt-1">Sell Signals</div>
-          </motion.div>
-
-          <motion.div 
-            whileHover={{ scale: 1.02 }}
-            className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl p-4 shadow-lg"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-amber-100 uppercase">Exits</span>
-              <Clock className="w-4 h-4 text-white" />
-            </div>
-            <div className="text-2xl font-bold text-white">{kpi.exits}</div>
-            <div className="text-xs text-amber-100 mt-1">Close Signals</div>
-          </motion.div>
-
-          <motion.div 
-            whileHover={{ scale: 1.02 }}
-            className="bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl p-4 shadow-lg"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-purple-100 uppercase">Watchlist</span>
-              <Star className="w-4 h-4 text-white" />
-            </div>
-            <div className="text-2xl font-bold text-white">{watchlist.size}</div>
-            <div className="text-xs text-purple-100 mt-1">Favorites</div>
           </motion.div>
         </div>
 
@@ -395,7 +421,44 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Signals Table */}
+        {/* Tab Navigation */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 mb-6">
+          <div className="flex border-b border-slate-200 dark:border-slate-700">
+            <button
+              onClick={() => setActiveTab('signals')}
+              className={`flex-1 px-6 py-4 text-sm font-bold transition-colors ${
+                activeTab === 'signals'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+              }`}
+            >
+              Signals ({signals.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('open')}
+              className={`flex-1 px-6 py-4 text-sm font-bold transition-colors ${
+                activeTab === 'open'
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+              }`}
+            >
+              Open Positions ({openTrades.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('closed')}
+              className={`flex-1 px-6 py-4 text-sm font-bold transition-colors ${
+                activeTab === 'closed'
+                  ? 'bg-slate-600 text-white'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+              }`}
+            >
+              Closed Trades ({closedTrades.length})
+            </button>
+          </div>
+        </div>
+
+        {/* Content based on active tab */}
+        {activeTab === 'signals' && (
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
             <div className="flex items-center justify-between">
@@ -520,6 +583,186 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+        )}
+
+        {activeTab === 'open' && (
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="bg-gradient-to-r from-slate-50 to-emerald-50 dark:from-slate-900 dark:to-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white uppercase tracking-wide">Open Positions</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Active trading positions</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">
+                  Showing <span className="text-emerald-600 dark:text-emerald-400 font-bold">{openTrades.length}</span> positions
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {openTrades.length === 0 ? (
+            <div className="text-center py-20">
+              <Activity className="w-16 h-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+              <p className="text-lg font-semibold text-slate-600 dark:text-slate-400">No open positions</p>
+              <p className="text-sm text-slate-500 dark:text-slate-500 mt-2">Positions will appear here when trades are opened</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-100 dark:bg-slate-900 border-b-2 border-slate-200 dark:border-slate-700">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Symbol</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Type</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Entry Price</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Position Size</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Leverage</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Entry Time</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Current P&L</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                  {openTrades.map((trade, idx) => (
+                    <motion.tr 
+                      key={trade.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.02 }}
+                      className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                    >
+                      <td className="px-4 py-4">
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">{trade.symbol}</span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
+                          trade.type === 'LONG' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
+                        } shadow-sm`}>
+                          {trade.type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">${parseFloat(trade.entry_price).toFixed(6)}</span>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">${trade.position_size?.toFixed(2) || '50.00'}</span>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">{trade.leverage || 5}x</span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          {new Date(trade.entry_time).toLocaleString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">--</span>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        )}
+
+        {activeTab === 'closed' && (
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="bg-gradient-to-r from-slate-50 to-slate-50 dark:from-slate-900 dark:to-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white uppercase tracking-wide">Closed Trades</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Completed trading history</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">
+                  Showing <span className="text-slate-600 dark:text-slate-400 font-bold">{closedTrades.length}</span> trades
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {closedTrades.length === 0 ? (
+            <div className="text-center py-20">
+              <Activity className="w-16 h-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+              <p className="text-lg font-semibold text-slate-600 dark:text-slate-400">No closed trades</p>
+              <p className="text-sm text-slate-500 dark:text-slate-500 mt-2">Trade history will appear here when positions are closed</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-100 dark:bg-slate-900 border-b-2 border-slate-200 dark:border-slate-700">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Symbol</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Type</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Entry Price</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Exit Price</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">P&L %</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">P&L USD</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Duration</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                  {closedTrades.slice(0, 50).map((trade, idx) => {
+                    const entryTime = new Date(trade.entry_time);
+                    const exitTime = new Date(trade.exit_time);
+                    const duration = exitTime.getTime() - entryTime.getTime();
+                    const hours = Math.floor(duration / (1000 * 60 * 60));
+                    const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
+                    
+                    return (
+                      <motion.tr 
+                        key={`${trade.symbol}-${trade.exit_time}`}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.02 }}
+                        className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                      >
+                        <td className="px-4 py-4">
+                          <span className="text-sm font-bold text-slate-900 dark:text-white">{trade.symbol}</span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
+                            trade.type === 'LONG' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
+                          } shadow-sm`}>
+                            {trade.type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <span className="text-sm font-bold text-slate-900 dark:text-white">${parseFloat(trade.entry_price).toFixed(6)}</span>
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <span className="text-sm font-bold text-slate-900 dark:text-white">${parseFloat(trade.exit_price).toFixed(6)}</span>
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <span className={`text-sm font-bold ${(trade.pnl_percent || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {(trade.pnl_percent || 0).toFixed(2)}%
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <span className={`text-sm font-bold ${(trade.pnl_usd || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            ${(trade.pnl_usd || 0).toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
+                            {hours}h {minutes}m
+                          </span>
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        )}
 
         {/* Footer Info */}
         <div className="mt-6 text-center">

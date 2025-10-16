@@ -26,10 +26,65 @@ class SupabaseManager:
         # Supabase client oluştur
         self.supabase: Client = create_client(self.url, self.key)
         
+    def get_portfolio_state(self) -> Dict:
+        """Get current portfolio state"""
+        try:
+            result = self.supabase.table('portfolio_state').select('*').limit(1).execute()
+            if result.data:
+                return result.data[0]
+            # Initialize with $1000
+            init_data = {
+                'total_balance': 1000.0,
+                'available_balance': 1000.0,
+                'used_balance': 0.0,
+                'total_pnl': 0.0
+            }
+            self.supabase.table('portfolio_state').insert(init_data).execute()
+            return init_data
+        except Exception as e:
+            print(f"Portfolio state error: {e}")
+            return {
+                'total_balance': 1000.0,
+                'available_balance': 1000.0,
+                'used_balance': 0.0,
+                'total_pnl': 0.0
+            }
+
+    def update_portfolio_balance(self, pnl_usd: float, position_size: float, is_opening: bool):
+        """Update portfolio after opening/closing position"""
+        try:
+            state = self.get_portfolio_state()
+            if is_opening:
+                state['available_balance'] -= position_size
+                state['used_balance'] += position_size
+            else:
+                state['available_balance'] += position_size + pnl_usd
+                state['used_balance'] -= position_size
+                state['total_pnl'] += pnl_usd
+                state['total_balance'] += pnl_usd
+            
+            self.supabase.table('portfolio_state').update(state).eq('id', state['id']).execute()
+        except Exception as e:
+            print(f"Portfolio update error: {e}")
+        
     def add_signal(self, symbol: str, signal_type: str, message: str, 
                    price: float, indicators: Dict, system: str = None) -> bool:
-        """Yeni sinyal ekle - Sistem bazlı"""
+        """Add signal only if not duplicate"""
         try:
+            # Check for recent identical signal (within 5 minutes)
+            five_min_ago = (datetime.now(pytz.utc) - timedelta(minutes=5)).isoformat()
+            existing = self.supabase.table('crypto_signals')\
+                .select('*')\
+                .eq('symbol', symbol)\
+                .eq('signal_type', signal_type)\
+                .eq('system', system)\
+                .gte('timestamp', five_min_ago)\
+                .execute()
+            
+            if existing.data:
+                print(f"Duplicate signal skipped: {symbol} {signal_type}")
+                return False
+            
             data = {
                 'symbol': symbol,
                 'signal_type': signal_type,
@@ -52,8 +107,17 @@ class SupabaseManager:
     
     def open_trade(self, symbol: str, trade_type: str, entry_price: float, 
                    atr_value: float = 0, stop_loss: float = 0, take_profit: float = 0, system: str = None) -> bool:
-        """Yeni işlem aç - ATR tabanlı SL/TP ile - Sistem bazlı"""
+        """Open trade with capital management"""
         try:
+            POSITION_SIZE = 50.0
+            LEVERAGE = 5
+            
+            # Check available balance
+            portfolio = self.get_portfolio_state()
+            if portfolio['available_balance'] < POSITION_SIZE:
+                print(f"Insufficient balance: ${portfolio['available_balance']:.2f} < ${POSITION_SIZE}")
+                return False
+            
             data = {
                 'symbol': symbol,
                 'trade_type': trade_type,
@@ -63,57 +127,69 @@ class SupabaseManager:
                 'atr_value': atr_value,
                 'stop_loss': stop_loss,
                 'take_profit': take_profit,
+                'position_size': POSITION_SIZE,
+                'leverage': LEVERAGE,
                 'system': system
             }
             
             result = self.supabase.table('open_trades').upsert(data).execute()
-            return len(result.data) > 0
+            if len(result.data) > 0:
+                self.update_portfolio_balance(0, POSITION_SIZE, is_opening=True)
+                return True
+            return False
             
         except Exception as e:
             print(f"Supabase işlem açma hatası: {e}")
             return False
     
-    def close_trade(self, symbol: str, exit_price: float) -> Optional[Dict]:
-        """İşlem kapat ve kar/zarar hesapla"""
+    def close_trade(self, symbol: str, exit_price: float, system: str = 'HYBRID_CRYPTO') -> Optional[Dict]:
+        """Close trade and calculate PnL with 5x leverage"""
         try:
-            # Açık işlemi getir
-            open_trade_result = self.supabase.table('open_trades').select('*').eq('symbol', symbol).execute()
+            open_trade_result = self.supabase.table('open_trades')\
+                .select('*')\
+                .eq('symbol', symbol)\
+                .eq('system', system)\
+                .execute()
             
             if not open_trade_result.data:
                 print(f"Açık işlem bulunamadı: {symbol}")
                 return None
             
-            open_trade = open_trade_result.data[0]
-            entry_price = float(open_trade['entry_price'])
-            trade_type = open_trade['trade_type']
+            trade = open_trade_result.data[0]
+            entry_price = float(trade['entry_price'])
+            trade_type = trade['trade_type']
+            position_size = trade.get('position_size', 50.0)
+            leverage = trade.get('leverage', 5)
             
-            # Kar/Zarar hesaplama
+            # Calculate percentage PnL
             if trade_type == 'LONG':
                 pnl_percent = ((exit_price - entry_price) / entry_price) * 100
-            else:  # SHORT
+            else:
                 pnl_percent = ((entry_price - exit_price) / entry_price) * 100
             
-            # Kapalı işlemler tablosuna ekle
+            # Calculate USD PnL with leverage
+            pnl_usd = (pnl_percent / 100) * position_size * leverage
+            
             closed_trade_data = {
                 'symbol': symbol,
                 'trade_type': trade_type,
                 'entry_price': entry_price,
-                'entry_time': open_trade['entry_time'],
+                'entry_time': trade['entry_time'],
                 'exit_price': exit_price,
                 'exit_time': datetime.now(pytz.utc).isoformat(),
                 'pnl_percent': round(pnl_percent, 2),
-                'status': 'CLOSED'
+                'pnl_usd': round(pnl_usd, 2),
+                'position_size': position_size,
+                'leverage': leverage,
+                'status': 'CLOSED',
+                'system': system
             }
             
-            closed_result = self.supabase.table('closed_trades').insert(closed_trade_data).execute()
+            self.supabase.table('closed_trades').insert(closed_trade_data).execute()
+            self.supabase.table('open_trades').delete().eq('symbol', symbol).eq('system', system).execute()
+            self.update_portfolio_balance(pnl_usd, position_size, is_opening=False)
             
-            # Açık işlemlerden sil
-            delete_result = self.supabase.table('open_trades').delete().eq('symbol', symbol).execute()
-            
-            if len(closed_result.data) > 0:
-                return closed_trade_data
-            
-            return None
+            return closed_trade_data
             
         except Exception as e:
             print(f"Supabase işlem kapatma hatası: {e}")
@@ -163,7 +239,12 @@ class SupabaseManager:
                     'type': row['trade_type'],
                     'entry_price': row['entry_price'],
                     'entry_time': row['entry_time'],
-                    'status': row['status']
+                    'status': row['status'],
+                    'position_size': row.get('position_size', 50.0),
+                    'leverage': row.get('leverage', 5),
+                    'stop_loss': row.get('stop_loss', 0),
+                    'take_profit': row.get('take_profit', 0),
+                    'system': row.get('system', 'HYBRID_CRYPTO')
                 }
             
             return open_trades
@@ -187,7 +268,11 @@ class SupabaseManager:
                     'exit_price': row['exit_price'],
                     'exit_time': row['exit_time'],
                     'pnl_percent': row['pnl_percent'],
-                    'status': row['status']
+                    'pnl_usd': row.get('pnl_usd', 0.0),
+                    'position_size': row.get('position_size', 50.0),
+                    'leverage': row.get('leverage', 5),
+                    'status': row['status'],
+                    'system': row.get('system', 'HYBRID_CRYPTO')
                 })
             
             return closed_trades

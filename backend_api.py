@@ -368,6 +368,18 @@ async def websocket_endpoint(websocket: WebSocket):
 # MARKET INFO
 # ----------------------------------------------------------------------
 
+@app.get("/api/portfolio")
+async def get_portfolio():
+    """Get portfolio state"""
+    try:
+        portfolio = supabase.get_portfolio_state()
+        return {
+            "success": True,
+            "portfolio": portfolio
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/markets")
 async def get_markets():
     """Get available markets - Crypto only"""

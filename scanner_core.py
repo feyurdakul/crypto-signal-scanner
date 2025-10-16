@@ -199,27 +199,30 @@ class CryptoScanner:
                     signal, message, indicators = strategy.generate_signal(current_position)
                     
                     if signal and message:
+                        # Prevent duplicate entry signals if already in position
+                        if current_position == 'LONG' and signal == 'LONG_ENTRY':
+                            continue  # Skip duplicate long entry
+                        if current_position == 'SHORT' and signal == 'SHORT_ENTRY':
+                            continue  # Skip duplicate short entry
+                        
                         price = indicators.get('close', 0)
                         atr_value = indicators.get('atr', 0)
                         
-                        # Sinyali kaydet
-                        self.data_manager.add_signal(symbol, signal, message, price, indicators, 'HYBRID_CRYPTO')
+                        # Add signal (will be rejected if duplicate)
+                        success = self.data_manager.add_signal(symbol, signal, message, price, indicators, 'HYBRID_CRYPTO')
                         
-                        # Giriş sinyali ise işlem aç
-                        if signal in ['LONG_ENTRY', 'SHORT_ENTRY']:
-                            self.data_manager.open_trade(
-                                symbol, signal, price, 
-                                datetime.now(pytz.utc).isoformat(), 
-                                atr_value, 'HYBRID_CRYPTO'
-                            )
-                        # Çıkış sinyali ise işlem kapat
-                        elif signal in ['LONG_EXIT', 'SHORT_EXIT']:
-                            self.data_manager.close_trade(
-                                symbol, signal, price,
-                                datetime.now(pytz.utc).isoformat(), 'HYBRID_CRYPTO'
-                            )
-                        
-                        signal_count += 1
+                        if success:
+                            signal_count += 1
+                            # Open/close trades
+                            if signal in ['LONG_ENTRY', 'SHORT_ENTRY']:
+                                self.data_manager.open_trade(
+                                    symbol, signal, price, 
+                                    atr_value, 0, 0, 'HYBRID_CRYPTO'
+                                )
+                            elif signal in ['LONG_EXIT', 'SHORT_EXIT']:
+                                self.data_manager.close_trade(
+                                    symbol, price, 'HYBRID_CRYPTO'
+                                )
                         
             except Exception as e:
                 error_count += 1
