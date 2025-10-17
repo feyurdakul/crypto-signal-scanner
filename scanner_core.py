@@ -229,8 +229,9 @@ class CryptoScanner:
                                 else:
                                     print(f"Failed to open trade: {symbol} {signal}")
                             elif signal in ['LONG_EXIT', 'SHORT_EXIT']:
+                                timestamp = datetime.now(pytz.utc).isoformat()
                                 closed_trade = self.data_manager.close_trade(
-                                    symbol, price, 'HYBRID_CRYPTO'
+                                    symbol, signal, price, timestamp, 'HYBRID_CRYPTO'
                                 )
                                 if closed_trade:
                                     print(f"Trade closed: {symbol} P&L: ${closed_trade.get('pnl_usd', 0):.2f}")
