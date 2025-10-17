@@ -26,20 +26,41 @@ class SupabaseManager:
         self.supabase: Client = create_client(self.url, self.key)
         
     def get_portfolio_state(self) -> Dict:
-        """Get current portfolio state"""
+        """Get current portfolio state with real-time calculations"""
         try:
+            # Get base portfolio state
             result = self.supabase.table('portfolio_state').select('*').limit(1).execute()
-            if result.data:
-                return result.data[0]
-            # Initialize with $1000
-            init_data = {
-                'total_balance': 1000.0,
-                'available_balance': 1000.0,
-                'used_balance': 0.0,
-                'total_pnl': 0.0
+            if not result.data:
+                # Initialize with $1000
+                init_data = {
+                    'total_balance': 1000.0,
+                    'available_balance': 1000.0,
+                    'used_balance': 0.0,
+                    'total_pnl': 0.0
+                }
+                self.supabase.table('portfolio_state').insert(init_data).execute()
+                base_state = init_data
+            else:
+                base_state = result.data[0]
+            
+            # Calculate real-time used balance from open trades
+            open_trades = self.supabase.table('open_trades').select('position_size').execute()
+            used_balance = sum(trade.get('position_size', 50.0) for trade in open_trades.data)
+            
+            # Calculate total PnL from closed trades
+            closed_trades = self.supabase.table('closed_trades').select('pnl_usd').execute()
+            total_pnl = sum(trade.get('pnl_usd', 0.0) for trade in closed_trades.data)
+            
+            # Calculate available balance
+            available_balance = base_state['total_balance'] + total_pnl - used_balance
+            
+            return {
+                'total_balance': base_state['total_balance'] + total_pnl,
+                'available_balance': max(0, available_balance),
+                'used_balance': used_balance,
+                'total_pnl': total_pnl
             }
-            self.supabase.table('portfolio_state').insert(init_data).execute()
-            return init_data
+            
         except Exception as e:
             print(f"Portfolio state error: {e}")
             return {
