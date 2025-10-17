@@ -61,7 +61,7 @@ class TVDataFetcher:
             
             if ohlcv:
                 # DataFrame formatına çevir
-                df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                df = pd.DataFrame(ohlcv, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
                 df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
                 df = df.set_index('datetime')
                 df = df.drop('timestamp', axis=1)
