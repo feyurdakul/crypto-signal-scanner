@@ -31,10 +31,10 @@ class SupabaseManager:
             # Get base portfolio state
             result = self.supabase.table('portfolio_state').select('*').limit(1).execute()
             if not result.data:
-                # Initialize with $1000
+                # Initialize with $10000
                 init_data = {
-                    'total_balance': 1000.0,
-                    'available_balance': 1000.0,
+                    'total_balance': 10000.0,
+                    'available_balance': 10000.0,
                     'used_balance': 0.0,
                     'total_pnl': 0.0
                 }
@@ -64,8 +64,8 @@ class SupabaseManager:
         except Exception as e:
             print(f"Portfolio state error: {e}")
             return {
-                'total_balance': 1000.0,
-                'available_balance': 1000.0,
+                'total_balance': 10000.0,
+                'available_balance': 10000.0,
                 'used_balance': 0.0,
                 'total_pnl': 0.0
             }
@@ -78,8 +78,8 @@ class SupabaseManager:
             if not result.data:
                 # Initialize if not exists
                 init_data = {
-                    'total_balance': 1000.0,
-                    'available_balance': 1000.0,
+                    'total_balance': 10000.0,
+                    'available_balance': 10000.0,
                     'used_balance': 0.0,
                     'total_pnl': 0.0
                 }
@@ -157,15 +157,24 @@ class SupabaseManager:
     
     def open_trade(self, symbol: str, trade_type: str, entry_price: float, 
                    atr_value: float = 0, stop_loss: float = 0, take_profit: float = 0, system: str = None) -> bool:
-        """Open trade with capital management"""
+        """Open trade with capital management - 1% of available balance"""
         try:
-            POSITION_SIZE = 50.0
             LEVERAGE = 5
             
-            # Check available balance
+            # Get current portfolio state
             portfolio = self.get_portfolio_state()
+            
+            # Calculate position size as 1% of available balance
+            POSITION_SIZE = portfolio['available_balance'] * 0.01
+            
+            # Minimum position size check (at least $10)
+            if POSITION_SIZE < 10.0:
+                print(f"Position size too small: ${POSITION_SIZE:.2f} < $10.00")
+                return False
+            
+            # Check available balance
             if portfolio['available_balance'] < POSITION_SIZE:
-                print(f"Insufficient balance: ${portfolio['available_balance']:.2f} < ${POSITION_SIZE}")
+                print(f"Insufficient balance: ${portfolio['available_balance']:.2f} < ${POSITION_SIZE:.2f}")
                 return False
             
             data = {
@@ -185,6 +194,7 @@ class SupabaseManager:
             result = self.supabase.table('open_trades').upsert(data).execute()
             if len(result.data) > 0:
                 self.update_portfolio_balance(0, POSITION_SIZE, is_opening=True)
+                print(f"Trade opened: {symbol} {trade_type} @ ${entry_price:.6f} - Position size: ${POSITION_SIZE:.2f} (1% of available balance)")
                 return True
             return False
             
