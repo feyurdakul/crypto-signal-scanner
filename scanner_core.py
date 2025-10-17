@@ -200,6 +200,9 @@ class CryptoScanner:
                     signal, message, indicators = strategy.generate_signal(current_position)
                     
                     if signal and message:
+                        print(f"Signal generated: {symbol} {signal}")
+                        print(f"Current position: {current_position}")
+                        
                         # Enhanced duplicate prevention
                         if current_position == 'LONG' and signal == 'LONG_ENTRY':
                             print(f"Skipping duplicate LONG_ENTRY for {symbol} (already in LONG position)")
@@ -216,27 +219,33 @@ class CryptoScanner:
                         
                         if success:
                             signal_count += 1
-                            print(f"Processing signal: {symbol} {signal} @ ${price:.6f}")
-                            
-                            # Open/close trades with enhanced checks
-                            if signal in ['LONG_ENTRY', 'SHORT_ENTRY']:
-                                timestamp = datetime.now(pytz.utc).isoformat()
-                                trade_success = self.data_manager.open_trade(
-                                    symbol, signal, price, timestamp, atr_value, 'HYBRID_CRYPTO'
-                                )
-                                if trade_success:
-                                    print(f"Trade opened: {symbol} {signal}")
-                                else:
-                                    print(f"Failed to open trade: {symbol} {signal}")
-                            elif signal in ['LONG_EXIT', 'SHORT_EXIT']:
-                                timestamp = datetime.now(pytz.utc).isoformat()
-                                closed_trade = self.data_manager.close_trade(
-                                    symbol, signal, price, timestamp, 'HYBRID_CRYPTO'
-                                )
-                                if closed_trade:
-                                    print(f"Trade closed: {symbol} P&L: ${closed_trade.get('pnl_usd', 0):.2f}")
-                                else:
-                                    print(f"Failed to close trade: {symbol}")
+                            print(f"Signal recorded: {symbol} {signal} @ ${price:.6f}")
+                        else:
+                            print(f"Signal not recorded (duplicate): {symbol} {signal} @ ${price:.6f}")
+                        
+                        # ALWAYS process trade logic regardless of signal recording
+                        print(f"Processing signal: {symbol} {signal} @ ${price:.6f}")
+                        print(f"Current position: {current_position}")
+                        
+                        # Open/close trades with enhanced checks
+                        if signal in ['LONG_ENTRY', 'SHORT_ENTRY']:
+                            timestamp = datetime.now(pytz.utc).isoformat()
+                            trade_success = self.data_manager.open_trade(
+                                symbol, signal, price, timestamp, atr_value, 'HYBRID_CRYPTO'
+                            )
+                            if trade_success:
+                                print(f"Trade opened: {symbol} {signal}")
+                            else:
+                                print(f"Failed to open trade: {symbol} {signal}")
+                        elif signal in ['LONG_EXIT', 'SHORT_EXIT']:
+                            timestamp = datetime.now(pytz.utc).isoformat()
+                            closed_trade = self.data_manager.close_trade(
+                                symbol, signal, price, timestamp, 'HYBRID_CRYPTO'
+                            )
+                            if closed_trade:
+                                print(f"Trade closed: {symbol} P&L: ${closed_trade.get('pnl_usd', 0):.2f}")
+                            else:
+                                print(f"Failed to close trade: {symbol}")
                         
             except Exception as e:
                 error_count += 1
