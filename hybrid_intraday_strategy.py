@@ -59,6 +59,11 @@ class HybridIntradayStrategy:
         self.RSI_BUY_LEVEL = 55
         self.RSI_SELL_LEVEL = 35
         
+        # Sinyal kalitesi parametreleri
+        self.MIN_ADX_FOR_ENTRY = 25  # Sadece güçlü trendlerde pozisyon aç
+        self.MIN_RSI_DISTANCE = 5    # RSI seviyelerinden minimum 5 puan uzaklık
+        self.MIN_QUALITY_SCORE = 80  # Minimum 80/100 puan gerekli
+        
         # İşlem saatleri (Market type'a göre)
         if market_type == 'CRYPTO':
             # Kripto: 7/24 çalışır
@@ -158,6 +163,76 @@ class HybridIntradayStrategy:
         
         return current_time >= square_off_time
     
+    def calculate_signal_quality(self, signal_type: str, indicators: Dict) -> int:
+        """Calculate signal quality score (0-100) based on multiple factors"""
+        score = 0
+        
+        rsi = indicators.get('rsi', 0)
+        adx = indicators.get('adx', 0)
+        vwap = indicators.get('vwap', 0)
+        close = indicators.get('close', 0)
+        
+        # 1. ADX Trend Strength (40 points max)
+        if adx >= self.MIN_ADX_FOR_ENTRY:
+            if adx >= 40:
+                score += 40  # Very strong trend
+            elif adx >= 30:
+                score += 30  # Strong trend
+            elif adx >= 25:
+                score += 20  # Moderate trend
+        else:
+            return 0  # No trend, reject signal
+        
+        # 2. RSI Distance from Levels (30 points max)
+        if signal_type == 'LONG_ENTRY':
+            rsi_distance = rsi - self.RSI_BUY_LEVEL
+            if rsi_distance >= self.MIN_RSI_DISTANCE:
+                if rsi_distance >= 10:
+                    score += 30  # Very clear breakout
+                elif rsi_distance >= 5:
+                    score += 20  # Clear breakout
+        elif signal_type == 'SHORT_ENTRY':
+            rsi_distance = self.RSI_SELL_LEVEL - rsi
+            if rsi_distance >= self.MIN_RSI_DISTANCE:
+                if rsi_distance >= 10:
+                    score += 30  # Very clear breakdown
+                elif rsi_distance >= 5:
+                    score += 20  # Clear breakdown
+        else:
+            return 0  # Invalid signal type
+        
+        # 3. Price vs VWAP Position (20 points max)
+        if signal_type == 'LONG_ENTRY' and close > vwap:
+            vwap_distance = ((close - vwap) / vwap) * 100
+            if vwap_distance >= 1.0:
+                score += 20  # Strong above VWAP
+            elif vwap_distance >= 0.5:
+                score += 15  # Above VWAP
+            else:
+                score += 10  # Just above VWAP
+        elif signal_type == 'SHORT_ENTRY' and close < vwap:
+            vwap_distance = ((vwap - close) / vwap) * 100
+            if vwap_distance >= 1.0:
+                score += 20  # Strong below VWAP
+            elif vwap_distance >= 0.5:
+                score += 15  # Below VWAP
+            else:
+                score += 10  # Just below VWAP
+        
+        # 4. RSI Momentum (10 points max)
+        if signal_type == 'LONG_ENTRY':
+            if rsi >= 60:
+                score += 10  # Strong bullish momentum
+            elif rsi >= 55:
+                score += 5   # Moderate bullish momentum
+        elif signal_type == 'SHORT_ENTRY':
+            if rsi <= 40:
+                score += 10  # Strong bearish momentum
+            elif rsi <= 35:
+                score += 5   # Moderate bearish momentum
+        
+        return min(score, 100)  # Cap at 100
+    
     def generate_signal(self, current_position: str = 'NONE') -> Tuple[Optional[str], Optional[str], Dict]:
         """Intraday Trading Strategy - TradingView koduna göre"""
         if self.df is None or self.df.empty or len(self.df) < 2:
@@ -219,7 +294,13 @@ class HybridIntradayStrategy:
                         break
         
         if buy_vwap and buy_adx and buy_rsi_cross:
-            return 'LONG_ENTRY', "📈 ALIM SİNYALİ - RSI CROSS UP 55", indicators
+            # Calculate signal quality score
+            quality_score = self.calculate_signal_quality('LONG_ENTRY', indicators)
+            if quality_score >= self.MIN_QUALITY_SCORE:
+                return 'LONG_ENTRY', f"📈 ALIM SİNYALİ - RSI CROSS UP 55 (Kalite: {quality_score}/100)", indicators
+            else:
+                print(f"❌ {self.symbol} LONG_ENTRY sinyali kalite yetersiz: {quality_score}/100 < {self.MIN_QUALITY_SCORE}")
+                return None, None, indicators
         
         # SELL RULES (TradingView original koduna göre - Esnek crossunder)
         # 1. Fiyat VWAP altında kapanmalı
@@ -241,6 +322,12 @@ class HybridIntradayStrategy:
                         break
         
         if sell_vwap and sell_adx and sell_rsi_cross:
-            return 'SHORT_ENTRY', "📉 SATIM SİNYALİ - RSI CROSS DOWN 35", indicators
+            # Calculate signal quality score
+            quality_score = self.calculate_signal_quality('SHORT_ENTRY', indicators)
+            if quality_score >= self.MIN_QUALITY_SCORE:
+                return 'SHORT_ENTRY', f"📉 SATIM SİNYALİ - RSI CROSS DOWN 35 (Kalite: {quality_score}/100)", indicators
+            else:
+                print(f"❌ {self.symbol} SHORT_ENTRY sinyali kalite yetersiz: {quality_score}/100 < {self.MIN_QUALITY_SCORE}")
+                return None, None, indicators
         
         return None, None, indicators
