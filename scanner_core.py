@@ -220,9 +220,9 @@ class CryptoScanner:
                             
                             # Open/close trades with enhanced checks
                             if signal in ['LONG_ENTRY', 'SHORT_ENTRY']:
+                                timestamp = datetime.now(pytz.utc).isoformat()
                                 trade_success = self.data_manager.open_trade(
-                                    symbol, signal, price, 
-                                    atr_value, 0, 0, 'HYBRID_CRYPTO'
+                                    symbol, signal, price, timestamp, atr_value, 'HYBRID_CRYPTO'
                                 )
                                 if trade_success:
                                     print(f"Trade opened: {symbol} {signal}")
