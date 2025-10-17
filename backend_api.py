@@ -38,7 +38,12 @@ app.add_middleware(
 )
 
 # Supabase manager
-supabase = SupabaseManager()
+try:
+    supabase = SupabaseManager()
+    print("✅ Supabase connection established")
+except Exception as e:
+    print(f"⚠️ Supabase connection failed: {e}")
+    supabase = None
 
 # Scanner lifecycle hooks
 @app.on_event("startup")
@@ -166,11 +171,16 @@ async def get_signals(
     - system: HYBRID, ELLIOTT (optional)
     - limit: Number of signals to return (default: 50)
     """
+    if supabase is None:
+        raise HTTPException(status_code=503, detail="Database connection unavailable")
+    
     try:
         all_signals = supabase.get_current_signals()
         
         # Filtreleme
         filtered_signals = []
+        seen_symbols = {}  # Sembol bazında en yeni sinyali tutmak için
+        
         for signal_key, signal_data in all_signals.items():
             signal_system = signal_data.get('system', '')
             
@@ -182,10 +192,18 @@ async def get_signals(
             if system and system.upper() not in signal_system:
                 continue
             
-            filtered_signals.append({
-                'id': signal_key,
-                **signal_data
-            })
+            # Aynı sembol için sadece en yeni sinyali ekle
+            symbol_key = f"{signal_data['symbol']}_{signal_data['signal_type']}"
+            existing_signal = seen_symbols.get(symbol_key)
+            
+            if existing_signal is None or signal_data['timestamp'] > existing_signal['timestamp']:
+                seen_symbols[symbol_key] = signal_data
+        
+        # Sadece en yeni sinyalleri kullan
+        filtered_signals = [
+            {'id': f"{data['symbol']}_{data['signal_type']}", **data} 
+            for data in seen_symbols.values()
+        ]
         
         # Timestamp'e göre sırala (en yeni önce)
         filtered_signals.sort(
@@ -209,6 +227,9 @@ async def get_signals(
 @app.get("/api/signals/stats")
 async def get_signal_stats():
     """Get signal statistics - Crypto Hybrid only"""
+    if supabase is None:
+        raise HTTPException(status_code=503, detail="Database connection unavailable")
+    
     try:
         all_signals = supabase.get_current_signals()
         
@@ -241,6 +262,9 @@ async def get_open_trades(
     system: Optional[str] = None
 ):
     """Get open trades"""
+    if supabase is None:
+        raise HTTPException(status_code=503, detail="Database connection unavailable")
+    
     try:
         open_trades = supabase.get_open_trades()
         
@@ -278,6 +302,9 @@ async def get_closed_trades(
     limit: Optional[int] = 100
 ):
     """Get closed trades"""
+    if supabase is None:
+        raise HTTPException(status_code=503, detail="Database connection unavailable")
+    
     try:
         closed_trades = supabase.get_closed_trades()
         
@@ -318,6 +345,9 @@ async def get_closed_trades(
 @app.get("/api/trades/performance")
 async def get_performance_stats():
     """Get performance statistics"""
+    if supabase is None:
+        raise HTTPException(status_code=503, detail="Database connection unavailable")
+    
     try:
         closed_trades = supabase.get_closed_trades()
         
@@ -382,8 +412,11 @@ async def websocket_endpoint(websocket: WebSocket):
             # Her 5 saniyede bir güncel veriyi gönder
             await asyncio.sleep(5)
             
-            # Güncel sinyalleri al
-            signals = supabase.get_current_signals()
+            # Güncel sinyalleri al (Supabase bağlantısı yoksa boş döndür)
+            if supabase is not None:
+                signals = supabase.get_current_signals()
+            else:
+                signals = {}
             
             # WebSocket üzerinden gönder
             await websocket.send_json({
@@ -404,6 +437,9 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.get("/api/portfolio")
 async def get_portfolio():
     """Get portfolio state"""
+    if supabase is None:
+        raise HTTPException(status_code=503, detail="Database connection unavailable")
+    
     try:
         portfolio = supabase.get_portfolio_state()
         return {
