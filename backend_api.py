@@ -44,18 +44,22 @@ supabase = SupabaseManager()
 @app.on_event("startup")
 async def start_scanner_background():
     global scanner_thread, scanner_instance
-    if scanner_thread is None or not scanner_thread.is_alive():
-        try:
-            from scanner_core import CryptoScanner  # local import to avoid circular issues
-            scanner_instance = CryptoScanner()
-            # Initialize synchronously
-            scanner_instance.initialize()
+    print("Starting scanner background thread...")
+    try:
+        from scanner_core import CryptoScanner  # local import to avoid circular issues
+        scanner_instance = CryptoScanner()
+        # Initialize synchronously
+        if scanner_instance.initialize():
             # Start in background thread
             scanner_thread = threading.Thread(target=scanner_instance.start, daemon=True)
             scanner_thread.start()
             print("✓ Scanner started in background thread.")
-        except Exception as e:
-            print(f"⚠️ Scanner startup failed: {e}")
+        else:
+            print("⚠️ Scanner initialization failed.")
+    except Exception as e:
+        print(f"⚠️ Scanner startup failed: {e}")
+        import traceback
+        traceback.print_exc()
 
 @app.on_event("shutdown")
 async def stop_scanner_background():
