@@ -89,6 +89,9 @@ class TVDataFetcher:
                     if pair.endswith('USDT'):
                         usdt_pairs.append(pair)
             
+            # Remove duplicates while preserving order
+            usdt_pairs = list(dict.fromkeys(usdt_pairs))
+            
             print(f"📋 pairs.md'den {len(usdt_pairs)} USDT çifti yüklendi")
             return usdt_pairs
             

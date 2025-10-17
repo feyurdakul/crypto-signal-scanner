@@ -152,7 +152,7 @@ class CryptoScanner:
         self.symbols = []
         self.strategies = {}
         self.running = False
-        self.scan_interval = 300  # 5 dakika = 300 saniye (15 dakikalık mum için optimal)
+        self.scan_interval = int(os.getenv("SCAN_INTERVAL", 600))  # 10 dakika = 600 saniye (varsayılan) 
         print(f"🚀 Crypto Sinyal Tarayıcı başlatıldı! (TVDatafeed + Hybrid Strategy)")
         print(f"⏰ Tarama aralığı: {self.scan_interval} saniye ({self.scan_interval/60:.1f} dakika)")
     

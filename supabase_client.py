@@ -20,8 +20,8 @@ class SupabaseManager:
     
     def __init__(self):
         # Supabase bağlantı bilgileri
-        self.url = "https://rkjndkslanwyoyefsicd.supabase.co"
-        self.key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJram5ka3NsYW53eW95ZWZzaWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkzOTY2MDcsImV4cCI6MjA3NDk3MjYwN30.XZd3mmNDhKHj2zIBovsFasj1S7LEhkHNvO79_OGJHxo"
+        self.url = os.getenv("SUPABASE_URL", "https://rkjndkslanwyoyefsicd.supabase.co")
+        self.key = os.getenv("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJram5ka3NsYW53eW95ZWZzaWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkzOTY2MDcsImV4cCI6MjA3NDk3MjYwN30.XZd3mmNDhKHj2zIBovsFasj1S7LEhkHNvO79_OGJHxo")
         
         # Supabase client oluştur
         self.supabase: Client = create_client(self.url, self.key)
