@@ -183,14 +183,14 @@ class HybridIntradayStrategy:
         
         # AÇIK POZİSYON VARSA - ÇIKIŞ SİNYALLERİ
         if current_position == 'LONG':
-            # BUY EXIT: Fiyat VWAP altına düşerse
-            if latest['Close'] < latest['VWAP']:
+            # BUY EXIT: Fiyat VWAP altına düşerse (0.5% tolerans ile)
+            if latest['Close'] < latest['VWAP'] * 0.995:
                 return 'LONG_EXIT', "📉 VWAP ALTINA DÜŞTÜ - UZUN POZİSYON KAPAT", indicators
             return None, None, indicators
         
         elif current_position == 'SHORT':
-            # SELL EXIT: Fiyat VWAP üzerine çıkarsa
-            if latest['Close'] > latest['VWAP']:
+            # SELL EXIT: Fiyat VWAP üzerine çıkarsa (0.5% tolerans ile)
+            if latest['Close'] > latest['VWAP'] * 1.005:
                 return 'SHORT_EXIT', "📈 VWAP ÜSTÜNE ÇIKTI - KISA POZİSYON KAPAT", indicators
             return None, None, indicators
         
