@@ -67,58 +67,7 @@ class SupabaseManager:
         except Exception as e:
             print(f"Portfolio update error: {e}")
         
-    def add_signal(self, symbol: str, signal_type: str, message: str, 
-                   price: float, indicators: Dict, system: str = None) -> bool:
-        """Add signal only if not duplicate - Enhanced duplicate prevention"""
-        try:
-            # Check for recent identical signal (within 10 minutes for better prevention)
-            ten_min_ago = (datetime.now(pytz.utc) - timedelta(minutes=10)).isoformat()
-            
-            # Check for any recent signal of same type for same symbol
-            existing = self.supabase.table('crypto_signals')\
-                .select('*')\
-                .eq('symbol', symbol)\
-                .eq('signal_type', signal_type)\
-                .eq('system', system)\
-                .gte('timestamp', ten_min_ago)\
-                .execute()
-            
-            if existing.data:
-                print(f"Duplicate signal skipped: {symbol} {signal_type} (found {len(existing.data)} recent signals)")
-                return False
-            
-            # Additional check: If we have an open position, don't add entry signals
-            if signal_type in ['LONG_ENTRY', 'SHORT_ENTRY']:
-                open_positions = self.supabase.table('open_trades')\
-                    .select('*')\
-                    .eq('symbol', symbol)\
-                    .eq('system', system)\
-                    .execute()
-                
-                if open_positions.data:
-                    print(f"Entry signal skipped: {symbol} {signal_type} (position already open)")
-                    return False
-            
-            data = {
-                'symbol': symbol,
-                'signal_type': signal_type,
-                'message': message,
-                'price': price,
-                'rsi': indicators.get('rsi'),
-                'adx': indicators.get('adx'),
-                'vwap': indicators.get('vwap'),
-                'atr': indicators.get('atr'),
-                'system': system,
-                'timestamp': datetime.now(pytz.utc).isoformat()
-            }
-            
-            result = self.supabase.table('crypto_signals').insert(data).execute()
-            print(f"Signal added: {symbol} {signal_type} @ ${price:.6f}")
-            return len(result.data) > 0
-            
-        except Exception as e:
-            print(f"Supabase sinyal ekleme hatası: {e}")
-            return False
+    def add_signal(self, symbol: str, signal_type: str, message: str, \n                   price: float, indicators: Dict, system: str = None) -> bool:\n        \"\"\"Add signal only if not duplicate - Enhanced duplicate prevention\"\"\"\n        try:\n            # Check for recent identical signal (within 10 minutes for better prevention)\n            ten_min_ago = (datetime.now(pytz.utc) - timedelta(minutes=10)).isoformat()\n            \n            # Check for any recent signal of same type for same symbol\n            existing = self.supabase.table('crypto_signals')\\\n                .select('*')\\\n                .eq('symbol', symbol)\\\n                .eq('signal_type', signal_type)\\\n                .eq('system', system)\\\n                .gte('timestamp', ten_min_ago)\\\n                .execute()\n            \n            if existing.data:\n                print(f\"Duplicate signal skipped: {symbol} {signal_type} (found {len(existing.data)} recent signals)\")\n                # Update the existing signal with new price if different\n                for item in existing.data:\n                    if abs(item['price'] - price) > 0.000001:  # Significant price change\n                        print(f\"Updating signal for {symbol} with new price: ${price}\")\n                        self.supabase.table('crypto_signals').update({\n                            'price': price,\n                            'rsi': indicators.get('rsi'),\n                            'adx': indicators.get('adx'),\n                            'vwap': indicators.get('vwap'),\n                            'atr': indicators.get('atr'),\n                            'timestamp': datetime.now(pytz.utc).isoformat()\n                        }).eq('id', item['id']).execute()\n                        return True\n                return False\n            \n            # Additional check: If we have an open position, don't add entry signals\n            if signal_type in ['LONG_ENTRY', 'SHORT_ENTRY']:\n                open_positions = self.supabase.table('open_trades')\\\n                    .select('*')\\\n                    .eq('symbol', symbol)\\\n                    .eq('system', system)\\\n                    .execute()\n                \n                if open_positions.data:\n                    print(f\"Entry signal skipped: {symbol} {signal_type} (position already open)\")\n                    return False\n            \n            data = {\n                'symbol': symbol,\n                'signal_type': signal_type,\n                'message': message,\n                'price': price,\n                'rsi': indicators.get('rsi'),\n                'adx': indicators.get('adx'),\n                'vwap': indicators.get('vwap'),\n                'atr': indicators.get('atr'),\n                'system': system,\n                'timestamp': datetime.now(pytz.utc).isoformat()\n            }\n            \n            result = self.supabase.table('crypto_signals').insert(data).execute()\n            print(f\"Signal added: {symbol} {signal_type} @ ${price:.6f}\")\n            return len(result.data) > 0\n            \n        except Exception as e:\n            print(f\"Supabase sinyal ekleme hatas\u0131: {e}\")\n            return False
     
     def open_trade(self, symbol: str, trade_type: str, entry_price: float, 
                    atr_value: float = 0, stop_loss: float = 0, take_profit: float = 0, system: str = None) -> bool:
@@ -232,13 +181,23 @@ class SupabaseManager:
             result = self.supabase.table('crypto_signals').select('*').order('timestamp', desc=True).limit(200).execute()
             
             signals = {}
+            seen_keys = set()  # Tekrar eden sinyalleri engellemek için
+            
             for row in result.data:
                 symbol = row['symbol']
                 system = row.get('system', 'UNKNOWN')
-                # Sistem bazlı unique key oluştur
-                signal_key = f"{symbol}_{system}_{row['timestamp']}"
                 
-                signals[signal_key] = {
+                # Sadece sembol ve sinyal türüne göre uniq anahtar oluştur
+                signal_key = f"{symbol}_{row['signal_type']}"
+                
+                # Eğer bu anahtara sahip bir sinyal zaten varsa ve daha yeni değilse, atla
+                if signal_key in seen_keys:
+                    continue
+                    
+                # Yeni bir sinyal anahtarı ekliyoruz
+                seen_keys.add(signal_key)
+                
+                signals[f"{signal_key}_{row['timestamp']}"] = {
                     'symbol': symbol,
                     'system': system,
                     'signal_type': row['signal_type'],

@@ -105,6 +105,8 @@ async def get_signals(
         
         # Filtreleme
         filtered_signals = []
+        seen_symbols = {}  # Sembol bazında en yeni sinyali tutmak için
+        
         for signal_key, signal_data in all_signals.items():
             signal_system = signal_data.get('system', '')
             
@@ -116,10 +118,18 @@ async def get_signals(
             if system and system.upper() not in signal_system:
                 continue
             
-            filtered_signals.append({
-                'id': signal_key,
-                **signal_data
-            })
+            # Aynı sembol için sadece en yeni sinyali ekle
+            symbol_key = f"{signal_data['symbol']}_{signal_data['signal_type']}"
+            existing_signal = seen_symbols.get(symbol_key)
+            
+            if existing_signal is None or signal_data['timestamp'] > existing_signal['timestamp']:
+                seen_symbols[symbol_key] = signal_data
+        
+        # Sadece en yeni sinyalleri kullan
+        filtered_signals = [
+            {'id': f"{data['symbol']}_{data['signal_type']}", **data} 
+            for data in seen_symbols.values()
+        ]
         
         # Timestamp'e göre sırala (en yeni önce)
         filtered_signals.sort(
