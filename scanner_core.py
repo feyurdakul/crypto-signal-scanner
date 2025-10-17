@@ -177,9 +177,9 @@ class CryptoScanner:
         return True
     
     def scan_once(self):
-        \"\"\"Tek tarama döngüsü\"\"\"
+        """Tek tarama döngüsü"""
         scan_time = datetime.now(pytz.utc)
-        print(f\"\\n[{scan_time.strftime('%Y-%m-%d %H:%M:%S UTC')}] Tarama başladı...\")
+        print(f"\n[{scan_time.strftime('%Y-%m-%d %H:%M:%S UTC')}] Tarama başladı...")
         
         # Heartbeat dosyası yaz - Railway için
         self._write_heartbeat(scan_time)
@@ -201,10 +201,10 @@ class CryptoScanner:
                     if signal and message:
                         # Enhanced duplicate prevention
                         if current_position == 'LONG' and signal == 'LONG_ENTRY':
-                            print(f\"Skipping duplicate LONG_ENTRY for {symbol} (already in LONG position)\")
+                            print(f"Skipping duplicate LONG_ENTRY for {symbol} (already in LONG position)")
                             continue
                         if current_position == 'SHORT' and signal == 'SHORT_ENTRY':
-                            print(f\"Skipping duplicate SHORT_ENTRY for {symbol} (already in SHORT position)\")
+                            print(f"Skipping duplicate SHORT_ENTRY for {symbol} (already in SHORT position)")
                             continue
                         
                         price = indicators.get('close', 0)
@@ -215,7 +215,7 @@ class CryptoScanner:
                         
                         if success:
                             signal_count += 1
-                            print(f\"Processing signal: {symbol} {signal} @ ${price:.6f}\")
+                            print(f"Processing signal: {symbol} {signal} @ ${price:.6f}")
                             
                             # Open/close trades with enhanced checks
                             if signal in ['LONG_ENTRY', 'SHORT_ENTRY']:
@@ -224,37 +224,37 @@ class CryptoScanner:
                                     atr_value, 0, 0, 'HYBRID_CRYPTO'
                                 )
                                 if trade_success:
-                                    print(f\"Trade opened: {symbol} {signal}\")
+                                    print(f"Trade opened: {symbol} {signal}")
                                 else:
-                                    print(f\"Failed to open trade: {symbol} {signal}\")
+                                    print(f"Failed to open trade: {symbol} {signal}")
                             elif signal in ['LONG_EXIT', 'SHORT_EXIT']:
                                 closed_trade = self.data_manager.close_trade(
                                     symbol, price, 'HYBRID_CRYPTO'
                                 )
                                 if closed_trade:
-                                    print(f\"Trade closed: {symbol} P&L: ${closed_trade.get('pnl_usd', 0):.2f}\")
+                                    print(f"Trade closed: {symbol} P&L: ${closed_trade.get('pnl_usd', 0):.2f}")
                                 else:
-                                    print(f\"Failed to close trade: {symbol}\")
+                                    print(f"Failed to close trade: {symbol}")
                         
             except Exception as e:
                 error_count += 1
                 if error_count <= 3:
-                    print(f\"⚠️ {symbol} hatası: {str(e)[:50]}...\")
+                    print(f"⚠️ {symbol} hatası: {str(e)[:50]}...")
         
         if signal_count > 0:
-            print(f\"✅ {signal_count} yeni sinyal Supabase'e kaydedildi!\")
+            print(f"✅ {signal_count} yeni sinyal Supabase'e kaydedildi!")
         else:
-            print(f\"📊 Tarama tamamlandı. Yeni sinyal yok.\")
+            print(f"📊 Tarama tamamlandı. Yeni sinyal yok.")
         
         if error_count > 0:
-            print(f\"⚠️ {error_count} sembol hatası (normal)\")
+            print(f"⚠️ {error_count} sembol hatası (normal)")
             
         # Portföy durumunu yazdır
         try:
             portfolio = self.data_manager.supabase.get_portfolio_state()
-            print(f\"💰 Portföy Durumu: ${portfolio['total_balance']:.2f} (Kullanılabilir: ${portfolio['available_balance']:.2f})\")
+            print(f"💰 Portföy Durumu: ${portfolio['total_balance']:.2f} (Kullanılabilir: ${portfolio['available_balance']:.2f})")
         except Exception as e:
-            print(f\"⚠️ Portföy durumu alınamadı: {e}\")
+            print(f"⚠️ Portföy durumu alınamadı: {e}")
     
     def start(self):
         """Sürekli taramayı başlat"""
