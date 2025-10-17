@@ -15,6 +15,12 @@ from datetime import datetime
 import pytz
 from supabase_client import SupabaseManager
 import asyncio
+import threading
+from typing import Optional as _Optional  # avoid shadowing
+
+# Lazy import to avoid heavy module load during import time
+scanner_thread = None
+scanner_instance = None
 
 app = FastAPI(
     title="Trading Signal API",
@@ -33,6 +39,33 @@ app.add_middleware(
 
 # Supabase manager
 supabase = SupabaseManager()
+
+# Scanner lifecycle hooks
+@app.on_event("startup")
+async def start_scanner_background():
+    global scanner_thread, scanner_instance
+    if scanner_thread is None or not scanner_thread.is_alive():
+        try:
+            from scanner_core import CryptoScanner  # local import to avoid circular issues
+            scanner_instance = CryptoScanner()
+            # Initialize synchronously
+            scanner_instance.initialize()
+            # Start in background thread
+            scanner_thread = threading.Thread(target=scanner_instance.start, daemon=True)
+            scanner_thread.start()
+            print("✓ Scanner started in background thread.")
+        except Exception as e:
+            print(f"⚠️ Scanner startup failed: {e}")
+
+@app.on_event("shutdown")
+async def stop_scanner_background():
+    global scanner_instance
+    try:
+        if scanner_instance is not None:
+            scanner_instance.stop()
+            print("✓ Scanner stop signal sent.")
+    except Exception:
+        pass
 
 # WebSocket connections
 active_connections: List[WebSocket] = []
@@ -81,6 +114,35 @@ async def health_check():
             status_code=500,
             content={"status": "unhealthy", "error": str(e)}
         )
+
+@app.post("/start-scanner")
+async def start_scanner():
+    """Manually start scanner"""
+    global scanner_thread, scanner_instance
+    try:
+        if scanner_thread is None or not scanner_thread.is_alive():
+            from scanner_core import CryptoScanner
+            scanner_instance = CryptoScanner()
+            scanner_instance.initialize()
+            scanner_thread = threading.Thread(target=scanner_instance.start, daemon=True)
+            scanner_thread.start()
+            return {"success": True, "message": "Scanner started successfully"}
+        else:
+            return {"success": False, "message": "Scanner already running"}
+    except Exception as e:
+        return {"success": False, "message": f"Failed to start scanner: {str(e)}"}
+
+@app.post("/close-trade/{symbol}")
+async def close_trade_manual(symbol: str, exit_price: float):
+    """Manually close a trade for debugging"""
+    try:
+        closed_trade = supabase.close_trade(symbol, exit_price, 'HYBRID_CRYPTO')
+        if closed_trade:
+            return {"success": True, "message": f"Trade closed for {symbol}", "trade": closed_trade}
+        else:
+            return {"success": False, "message": f"No open trade found for {symbol}"}
+    except Exception as e:
+        return {"success": False, "message": f"Failed to close trade: {str(e)}"}
 
 # ----------------------------------------------------------------------
 # SIGNALS ENDPOINTS
@@ -345,6 +407,18 @@ async def websocket_endpoint(websocket: WebSocket):
 # MARKET INFO
 # ----------------------------------------------------------------------
 
+@app.get("/api/portfolio")
+async def get_portfolio():
+    """Get portfolio state"""
+    try:
+        portfolio = supabase.get_portfolio_state()
+        return {
+            "success": True,
+            "portfolio": portfolio
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/markets")
 async def get_markets():
     """Get available markets - Crypto only"""
@@ -367,4 +441,3 @@ async def get_markets():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
