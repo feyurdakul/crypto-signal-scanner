@@ -51,6 +51,7 @@ export default function Dashboard() {
   const [showFilters, setShowFilters] = useState(false);
   const [portfolio, setPortfolio] = useState<any>(null);
   const [openTrades, setOpenTrades] = useState<any[]>([]);
+  const [openTradesWithPnl, setOpenTradesWithPnl] = useState<any[]>([]);
   const [closedTrades, setClosedTrades] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'signals' | 'open' | 'closed'>('signals');
 
@@ -98,7 +99,7 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const [signalsRes, statsRes, marketsRes, healthRes, portfolioRes, openTradesRes, closedTradesRes] = await Promise.all([
+      const [signalsRes, statsRes, marketsRes, healthRes, portfolioRes, openTradesRes, openTradesWithPnlRes, closedTradesRes] = await Promise.all([
         axios.get(`${API_URL}/api/signals`, {
           params: {
             market: selectedMarket !== 'ALL' ? selectedMarket : undefined,
@@ -111,6 +112,7 @@ export default function Dashboard() {
         axios.get(`${API_URL}/health`),
         axios.get(`${API_URL}/api/portfolio`),
         axios.get(`${API_URL}/api/trades/open`),
+        axios.get(`${API_URL}/api/trades/open-with-pnl`),
         axios.get(`${API_URL}/api/trades/closed`)
       ]);
 
@@ -120,6 +122,7 @@ export default function Dashboard() {
       setScannerStatus(healthRes.data.scanner || 'offline');
       setPortfolio(portfolioRes.data.portfolio || null);
       setOpenTrades(openTradesRes.data.trades || []);
+      setOpenTradesWithPnl(openTradesWithPnlRes.data.trades || []);
       setClosedTrades(closedTradesRes.data.trades || []);
       setLoading(false);
       setRefreshing(false);
@@ -442,7 +445,7 @@ export default function Dashboard() {
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
               }`}
             >
-              Open Positions ({openTrades.length})
+              Open Positions ({openTradesWithPnl.length})
             </button>
             <button
               onClick={() => setActiveTab('closed')}
@@ -595,13 +598,13 @@ export default function Dashboard() {
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">
-                  Showing <span className="text-emerald-600 dark:text-emerald-400 font-bold">{openTrades.length}</span> positions
+                  Showing <span className="text-emerald-600 dark:text-emerald-400 font-bold">{openTradesWithPnl.length}</span> positions
                 </span>
               </div>
             </div>
           </div>
 
-          {openTrades.length === 0 ? (
+          {openTradesWithPnl.length === 0 ? (
             <div className="text-center py-20">
               <Activity className="w-16 h-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
               <p className="text-lg font-semibold text-slate-600 dark:text-slate-400">No open positions</p>
@@ -615,14 +618,16 @@ export default function Dashboard() {
                     <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Symbol</th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Type</th>
                     <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Entry Price</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Current Price</th>
                     <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Position Size</th>
                     <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Leverage</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">P&L %</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">P&L USD</th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Entry Time</th>
-                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Current P&L</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {openTrades.map((trade, idx) => (
+                  {openTradesWithPnl.map((trade, idx) => (
                     <motion.tr 
                       key={trade.id}
                       initial={{ opacity: 0, y: 20 }}
@@ -644,10 +649,25 @@ export default function Dashboard() {
                         <span className="text-sm font-bold text-slate-900 dark:text-white">${parseFloat(trade.entry_price).toFixed(6)}</span>
                       </td>
                       <td className="px-4 py-4 text-right">
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">
+                          {trade.current_price ? `$${trade.current_price.toFixed(6)}` : '--'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-right">
                         <span className="text-sm font-bold text-slate-900 dark:text-white">${trade.position_size?.toFixed(2) || '50.00'}</span>
                       </td>
                       <td className="px-4 py-4 text-right">
                         <span className="text-sm font-bold text-slate-900 dark:text-white">{trade.leverage || 5}x</span>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <span className={`text-sm font-bold ${(trade.pnl_percent || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {trade.current_price ? `${trade.pnl_percent?.toFixed(2) || '0.00'}%` : '--'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <span className={`text-sm font-bold ${(trade.pnl_usd || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {trade.current_price ? `$${trade.pnl_usd?.toFixed(2) || '0.00'}` : '--'}
+                        </span>
                       </td>
                       <td className="px-4 py-4">
                         <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -658,9 +678,6 @@ export default function Dashboard() {
                             minute: '2-digit'
                           })}
                         </span>
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        <span className="text-sm font-bold text-slate-900 dark:text-white">--</span>
                       </td>
                     </motion.tr>
                   ))}

@@ -419,6 +419,73 @@ async def get_portfolio():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/trades/open-with-pnl")
+async def get_open_trades_with_pnl():
+    """Get open trades with real-time PnL calculation"""
+    try:
+        open_trades = supabase.get_open_trades()
+        
+        # Calculate real-time PnL for each trade
+        trades_with_pnl = []
+        for trade_key, trade_data in open_trades.items():
+            try:
+                # Get current price from data fetcher
+                from data_fetcher import TVDataFetcher
+                data_fetcher = TVDataFetcher()
+                
+                # Fetch current price
+                current_price = None
+                try:
+                    ohlcv_data = data_fetcher.fetch_ohlcv(trade_data['symbol'], '15m', 1)
+                    if ohlcv_data is not None and not ohlcv_data.empty:
+                        current_price = float(ohlcv_data.iloc[-1]['Close'])
+                except Exception as e:
+                    print(f"Error fetching current price for {trade_data['symbol']}: {e}")
+                    current_price = None
+                
+                # Calculate PnL if we have current price
+                pnl_percent = 0
+                pnl_usd = 0
+                if current_price is not None:
+                    entry_price = float(trade_data['entry_price'])
+                    trade_type = trade_data['type']
+                    position_size = trade_data.get('position_size', 50.0)
+                    leverage = trade_data.get('leverage', 5)
+                    
+                    if trade_type == 'LONG':
+                        pnl_percent = ((current_price - entry_price) / entry_price) * 100
+                    else:  # SHORT
+                        pnl_percent = ((entry_price - current_price) / entry_price) * 100
+                    
+                    pnl_usd = (pnl_percent / 100) * position_size * leverage
+                
+                trades_with_pnl.append({
+                    'id': trade_key,
+                    **trade_data,
+                    'current_price': current_price,
+                    'pnl_percent': round(pnl_percent, 2),
+                    'pnl_usd': round(pnl_usd, 2)
+                })
+                
+            except Exception as e:
+                print(f"Error calculating PnL for {trade_data['symbol']}: {e}")
+                trades_with_pnl.append({
+                    'id': trade_key,
+                    **trade_data,
+                    'current_price': None,
+                    'pnl_percent': 0,
+                    'pnl_usd': 0
+                })
+        
+        return {
+            "success": True,
+            "count": len(trades_with_pnl),
+            "trades": trades_with_pnl
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/markets")
 async def get_markets():
     """Get available markets - Crypto only"""
