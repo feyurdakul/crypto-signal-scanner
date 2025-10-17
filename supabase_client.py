@@ -73,7 +73,21 @@ class SupabaseManager:
     def update_portfolio_balance(self, pnl_usd: float, position_size: float, is_opening: bool):
         """Update portfolio after opening/closing position"""
         try:
-            state = self.get_portfolio_state()
+            # Get the actual database record with ID
+            result = self.supabase.table('portfolio_state').select('*').limit(1).execute()
+            if not result.data:
+                # Initialize if not exists
+                init_data = {
+                    'total_balance': 1000.0,
+                    'available_balance': 1000.0,
+                    'used_balance': 0.0,
+                    'total_pnl': 0.0
+                }
+                self.supabase.table('portfolio_state').insert(init_data).execute()
+                result = self.supabase.table('portfolio_state').select('*').limit(1).execute()
+            
+            state = result.data[0]
+            
             if is_opening:
                 state['available_balance'] -= position_size
                 state['used_balance'] += position_size
@@ -83,6 +97,7 @@ class SupabaseManager:
                 state['total_pnl'] += pnl_usd
                 state['total_balance'] += pnl_usd
             
+            # Update using the ID from the database record
             self.supabase.table('portfolio_state').update(state).eq('id', state['id']).execute()
         except Exception as e:
             print(f"Portfolio update error: {e}")
