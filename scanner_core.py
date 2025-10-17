@@ -7,6 +7,7 @@ CCXT ile Binance'deki tüm USDT çiftlerini tarar
 import pandas as pd
 import numpy as np
 import time
+import os
 from datetime import datetime
 import pytz
 import threading
