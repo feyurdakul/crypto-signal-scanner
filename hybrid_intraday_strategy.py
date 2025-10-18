@@ -198,6 +198,22 @@ class HybridIntradayStrategy:
                     score += 30  # Very clear breakdown
                 elif rsi_distance >= 5:
                     score += 20  # Clear breakdown
+        elif signal_type in ['LONG_EXIT', 'SHORT_EXIT']:
+            # For EXIT signals, use similar but reversed logic
+            if signal_type == 'LONG_EXIT':
+                rsi_distance = self.RSI_SELL_LEVEL - rsi
+                if rsi_distance >= self.MIN_RSI_DISTANCE:
+                    if rsi_distance >= 10:
+                        score += 30  # Very clear breakdown
+                    elif rsi_distance >= 5:
+                        score += 20  # Clear breakdown
+            elif signal_type == 'SHORT_EXIT':
+                rsi_distance = rsi - self.RSI_BUY_LEVEL
+                if rsi_distance >= self.MIN_RSI_DISTANCE:
+                    if rsi_distance >= 10:
+                        score += 30  # Very clear breakout
+                    elif rsi_distance >= 5:
+                        score += 20  # Clear breakout
         else:
             return 0  # Invalid signal type
         
@@ -218,6 +234,22 @@ class HybridIntradayStrategy:
                 score += 15  # Below VWAP
             else:
                 score += 10  # Just below VWAP
+        elif signal_type == 'LONG_EXIT' and close < vwap:
+            vwap_distance = ((vwap - close) / vwap) * 100
+            if vwap_distance >= 1.0:
+                score += 20  # Strong below VWAP
+            elif vwap_distance >= 0.5:
+                score += 15  # Below VWAP
+            else:
+                score += 10  # Just below VWAP
+        elif signal_type == 'SHORT_EXIT' and close > vwap:
+            vwap_distance = ((close - vwap) / vwap) * 100
+            if vwap_distance >= 1.0:
+                score += 20  # Strong above VWAP
+            elif vwap_distance >= 0.5:
+                score += 15  # Above VWAP
+            else:
+                score += 10  # Just above VWAP
         
         # 4. RSI Momentum (10 points max)
         if signal_type == 'LONG_ENTRY':
@@ -230,6 +262,16 @@ class HybridIntradayStrategy:
                 score += 10  # Strong bearish momentum
             elif rsi <= 35:
                 score += 5   # Moderate bearish momentum
+        elif signal_type == 'LONG_EXIT':
+            if rsi <= 40:
+                score += 10  # Strong bearish momentum
+            elif rsi <= 45:
+                score += 5   # Moderate bearish momentum
+        elif signal_type == 'SHORT_EXIT':
+            if rsi >= 60:
+                score += 10  # Strong bullish momentum
+            elif rsi >= 55:
+                score += 5   # Moderate bullish momentum
         
         return min(score, 100)  # Cap at 100
     
@@ -260,13 +302,25 @@ class HybridIntradayStrategy:
         if current_position == 'LONG':
             # BUY EXIT: Fiyat VWAP altına düşerse (0.5% tolerans ile)
             if latest['Close'] < latest['VWAP'] * 0.995:
-                return 'LONG_EXIT', "📉 VWAP ALTINA DÜŞTÜ - UZUN POZİSYON KAPAT", indicators
+                # Calculate quality score for exit
+                quality_score = self.calculate_signal_quality('LONG_EXIT', indicators)
+                if quality_score >= self.MIN_QUALITY_SCORE:
+                    return 'LONG_EXIT', f"📉 VWAP ALTINA DÜŞTÜ - UZUN POZİSYON KAPAT (Kalite: {quality_score}/100)", indicators
+                else:
+                    print(f"❌ {self.symbol} LONG_EXIT sinyali kalite yetersiz: {quality_score}/100 < {self.MIN_QUALITY_SCORE}")
+                    return None, None, indicators
             return None, None, indicators
         
         elif current_position == 'SHORT':
             # SELL EXIT: Fiyat VWAP üzerine çıkarsa (0.5% tolerans ile)
             if latest['Close'] > latest['VWAP'] * 1.005:
-                return 'SHORT_EXIT', "📈 VWAP ÜSTÜNE ÇIKTI - KISA POZİSYON KAPAT", indicators
+                # Calculate quality score for exit
+                quality_score = self.calculate_signal_quality('SHORT_EXIT', indicators)
+                if quality_score >= self.MIN_QUALITY_SCORE:
+                    return 'SHORT_EXIT', f"📈 VWAP ÜSTÜNE ÇIKTI - KISA POZİSYON KAPAT (Kalite: {quality_score}/100)", indicators
+                else:
+                    print(f"❌ {self.symbol} SHORT_EXIT sinyali kalite yetersiz: {quality_score}/100 < {self.MIN_QUALITY_SCORE}")
+                    return None, None, indicators
             return None, None, indicators
         
         # POZİSYON KAPALI - GİRİŞ SİNYALLERİ

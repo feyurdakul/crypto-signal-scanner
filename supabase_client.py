@@ -103,7 +103,7 @@ class SupabaseManager:
             print(f"Portfolio update error: {e}")
         
     def add_signal(self, symbol: str, signal_type: str, message: str, 
-                   price: float, indicators: Dict, system: str = None) -> bool:
+                   price: float, indicators: Dict, system: str = None, quality_score: int = None) -> bool:
         """Add signal only if not duplicate - Enhanced duplicate prevention"""
         try:
             # Check for recent identical signal (within 10 minutes for better prevention)
@@ -144,6 +144,7 @@ class SupabaseManager:
                 'vwap': indicators.get('vwap'),
                 'atr': indicators.get('atr'),
                 'system': system,
+                'quality_score': quality_score,
                 'timestamp': datetime.now(pytz.utc).isoformat()
             }
             
@@ -289,7 +290,8 @@ class SupabaseManager:
                     'rsi': row.get('rsi'),
                     'adx': row.get('adx'),
                     'vwap': row.get('vwap'),
-                    'atr': row.get('atr')
+                    'atr': row.get('atr'),
+                    'quality_score': row.get('quality_score')
                 }
             
             return signals

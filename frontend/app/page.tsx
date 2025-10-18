@@ -22,6 +22,7 @@ interface Signal {
   system: string;
   rsi?: number;
   adx?: number;
+  quality_score?: number;
 }
 
 interface MarketStatus {
@@ -111,7 +112,7 @@ export default function Dashboard() {
         axios.get(`${API_URL}/api/markets`),
         axios.get(`${API_URL}/health`),
         axios.get(`${API_URL}/api/portfolio`),
-        axios.get(`${API_URL}/api/trades/open`),
+        axios.get(`${API_URL}/api/trades/open-with-pnl`),
         axios.get(`${API_URL}/api/trades/closed`)
       ]);
 
@@ -269,7 +270,8 @@ export default function Dashboard() {
                 <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-700/50 border border-slate-600">
                   <Clock className="w-4 h-4 text-slate-300" />
                   <span className="text-xs text-slate-300">
-                    Last scan: {new Date(lastScan).toLocaleTimeString('en-US', { 
+                    Last scan: {new Date(lastScan).toLocaleTimeString('tr-TR', { 
+                      timeZone: 'Europe/Istanbul',
                       hour: '2-digit', 
                       minute: '2-digit',
                       second: '2-digit'
@@ -511,6 +513,7 @@ export default function Dashboard() {
                     <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider w-12">Rank</th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Symbol</th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Signal</th>
+                    <th className="text-center px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Quality</th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">System</th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Market</th>
                     <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Price</th>
@@ -553,6 +556,19 @@ export default function Dashboard() {
                           <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${getSignalBadgeClass(s.signal_type)} shadow-sm`}>
                             {s.signal_type.replace('_', ' ')}
                           </span>
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          {s.quality_score ? (
+                            <span className={`px-2 py-1 rounded text-xs font-bold ${
+                              s.quality_score >= 90 ? 'bg-emerald-500 text-white' :
+                              s.quality_score >= 80 ? 'bg-blue-500 text-white' :
+                              'bg-slate-400 text-white'
+                            }`}>
+                              {s.quality_score}/100
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs">N/A</span>
+                          )}
                         </td>
                         <td className="px-4 py-4">
                           {getSystemBadge(s.system)}
@@ -631,6 +647,9 @@ export default function Dashboard() {
                     <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Symbol</th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Type</th>
                     <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Entry Price</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Current Price</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">P&L %</th>
+                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">P&L USD</th>
                     <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Position Size</th>
                     <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Leverage</th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Entry Time</th>
@@ -658,6 +677,22 @@ export default function Dashboard() {
                       </td>
                       <td className="px-4 py-4 text-right">
                         <span className="text-sm font-bold text-slate-900 dark:text-white">${parseFloat(trade.entry_price).toFixed(6)}</span>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        {trade.current_price ? 
+                          <span className="text-sm font-bold text-slate-900 dark:text-white">${parseFloat(trade.current_price).toFixed(6)}</span> : 
+                          <span className="text-sm text-slate-400">Loading...</span>
+                        }
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <span className={`text-sm font-bold ${(trade.pnl_percent || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {(trade.pnl_percent || 0).toFixed(2)}%
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <span className={`text-sm font-bold ${(trade.pnl_usd || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          ${(trade.pnl_usd || 0).toFixed(2)}
+                        </span>
                       </td>
                       <td className="px-4 py-4 text-right">
                         <span className="text-sm font-bold text-slate-900 dark:text-white">${trade.position_size?.toFixed(2) || '50.00'}</span>
@@ -788,7 +823,9 @@ export default function Dashboard() {
             Auto-refreshing every 5 seconds • Last update: {new Date().toLocaleTimeString()}
             {lastScan && (
               <span className="ml-2">
-                • Scanner last scan: {new Date(lastScan).toLocaleTimeString()}
+                • Scanner last scan: {new Date(lastScan).toLocaleTimeString('tr-TR', {
+                  timeZone: 'Europe/Istanbul'
+                })}
               </span>
             )}
           </p>

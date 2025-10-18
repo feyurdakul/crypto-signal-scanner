@@ -52,11 +52,11 @@ class DataManager:
             self.open_trades = {}
             self.closed_trades = []
     
-    def add_signal(self, symbol, signal_type, message, price, indicators, system='HYBRID_CRYPTO'):
+    def add_signal(self, symbol, signal_type, message, price, indicators, system='HYBRID_CRYPTO', quality_score=None):
         """Yeni sinyal ekle"""
         try:
             # Supabase'e ekle
-            success = self.supabase.add_signal(symbol, signal_type, message, price, indicators, system)
+            success = self.supabase.add_signal(symbol, signal_type, message, price, indicators, system, quality_score)
             
             if success:
                 # Local cache'i güncelle
@@ -214,8 +214,13 @@ class CryptoScanner:
                         price = indicators.get('close', 0)
                         atr_value = indicators.get('atr', 0)
                         
+                        # Calculate quality score for ENTRY signals
+                        quality_score = None
+                        if signal in ['LONG_ENTRY', 'SHORT_ENTRY']:
+                            quality_score = strategy.calculate_signal_quality(signal, indicators)
+                        
                         # Add signal (will be rejected if duplicate)
-                        success = self.data_manager.add_signal(symbol, signal, message, price, indicators, 'HYBRID_CRYPTO')
+                        success = self.data_manager.add_signal(symbol, signal, message, price, indicators, 'HYBRID_CRYPTO', quality_score)
                         
                         if success:
                             signal_count += 1
