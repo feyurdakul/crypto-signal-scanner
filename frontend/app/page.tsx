@@ -112,7 +112,7 @@ export default function Dashboard() {
         axios.get(`${API_URL}/api/markets`),
         axios.get(`${API_URL}/health`),
         axios.get(`${API_URL}/api/portfolio`),
-        axios.get(`${API_URL}/api/trades/open-with-pnl`),
+        axios.get(`${API_URL}/api/trades/open`),
         axios.get(`${API_URL}/api/trades/closed`)
       ]);
 
@@ -647,9 +647,6 @@ export default function Dashboard() {
                     <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Symbol</th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Type</th>
                     <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Entry Price</th>
-                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Current Price</th>
-                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">P&L %</th>
-                    <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">P&L USD</th>
                     <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Position Size</th>
                     <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Leverage</th>
                     <th className="text-left px-4 py-3 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Entry Time</th>
@@ -677,22 +674,6 @@ export default function Dashboard() {
                       </td>
                       <td className="px-4 py-4 text-right">
                         <span className="text-sm font-bold text-slate-900 dark:text-white">${parseFloat(trade.entry_price).toFixed(6)}</span>
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        {trade.current_price ? 
-                          <span className="text-sm font-bold text-slate-900 dark:text-white">${parseFloat(trade.current_price).toFixed(6)}</span> : 
-                          <span className="text-sm text-slate-400">Loading...</span>
-                        }
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        <span className={`text-sm font-bold ${(trade.pnl_percent || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                          {(trade.pnl_percent || 0).toFixed(2)}%
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        <span className={`text-sm font-bold ${(trade.pnl_usd || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                          ${(trade.pnl_usd || 0).toFixed(2)}
-                        </span>
                       </td>
                       <td className="px-4 py-4 text-right">
                         <span className="text-sm font-bold text-slate-900 dark:text-white">${trade.position_size?.toFixed(2) || '50.00'}</span>
