@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [scannerStatus, setScannerStatus] = useState<string>('checking...');
+  const [lastScan, setLastScan] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [signalScope, setSignalScope] = useState<'ALL' | 'ENTRY' | 'EXIT'>('ALL');
   const [sortBy, setSortBy] = useState<'timestamp' | 'symbol' | 'price'>('timestamp');
@@ -118,6 +119,7 @@ export default function Dashboard() {
       setMarketStats(statsRes.data.stats || {});
       setMarkets(marketsRes.data.markets || {});
       setScannerStatus(healthRes.data.scanner || 'offline');
+      setLastScan(healthRes.data.last_scan || null);
       setPortfolio(portfolioRes.data.portfolio || null);
       setOpenTrades(openTradesRes.data.trades || []);
       setClosedTrades(closedTradesRes.data.trades || []);
@@ -262,6 +264,20 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center space-x-3">
+              {/* Last Scan Time */}
+              {lastScan && (
+                <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-700/50 border border-slate-600">
+                  <Clock className="w-4 h-4 text-slate-300" />
+                  <span className="text-xs text-slate-300">
+                    Last scan: {new Date(lastScan).toLocaleTimeString('en-US', { 
+                      hour: '2-digit', 
+                      minute: '2-digit',
+                      second: '2-digit'
+                    })}
+                  </span>
+                </div>
+              )}
+              
               <button
                 onClick={() => setDarkMode(!darkMode)}
                 className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-600/50 transition-colors border border-slate-600"
@@ -770,6 +786,11 @@ export default function Dashboard() {
         <div className="mt-6 text-center">
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Auto-refreshing every 5 seconds • Last update: {new Date().toLocaleTimeString()}
+            {lastScan && (
+              <span className="ml-2">
+                • Scanner last scan: {new Date(lastScan).toLocaleTimeString()}
+              </span>
+            )}
           </p>
         </div>
       </div>
