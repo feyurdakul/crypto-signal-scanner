@@ -9,4 +9,4 @@ echo "Installing requirements if needed..."
 pip install -r requirements.txt
 
 echo "Starting FastAPI with uvicorn..."
-PORT=${PORT:-8000} uvicorn backend_api:app --host 0.0.0.0 --port $PORT --workers 1 --timeout-keep-alive 30
+PORT=${PORT:-8000} uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1 --timeout-keep-alive 30
