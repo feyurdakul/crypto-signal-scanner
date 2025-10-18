@@ -94,14 +94,18 @@ async def health_check():
         last_scan = None
         
         if heartbeat_file.exists():
-            data = json.loads(heartbeat_file.read_text())
-            last_scan_time = datetime.fromisoformat(data['last_scan'])
-            now = datetime.now(pytz.utc)
-            diff = (now - last_scan_time).total_seconds()
-            
-            if diff < 120:  # Son 2 dakika içinde
-                scanner_status = "online"
-                last_scan = data['last_scan']
+            try:
+                data = json.loads(heartbeat_file.read_text())
+                if 'last_scan' in data and data['last_scan']:
+                    last_scan_time = datetime.fromisoformat(data['last_scan'].replace('Z', '+00:00'))
+                    now = datetime.now(pytz.utc)
+                    diff = (now - last_scan_time).total_seconds()
+                    
+                    if diff < 300:  # Son 5 dakika içinde
+                        scanner_status = "online"
+                        last_scan = data['last_scan']
+            except Exception as e:
+                print(f"Heartbeat parse error: {e}")
         
         return {
             "status": "healthy",
